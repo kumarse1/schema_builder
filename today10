@@ -21,9 +21,18 @@ logger = logging.getLogger(__name__)
 try:
     import fitz  # PyMuPDF
     PYMUPDF_AVAILABLE = True
+    st.success(f"✅ PyMuPDF version {fitz.version[0]} available")
 except ImportError:
     PYMUPDF_AVAILABLE = False
     st.warning("⚠️ PyMuPDF not available. PDF processing will be limited.")
+
+# Alternative PDF libraries check
+try:
+    import pdfplumber
+    PDFPLUMBER_AVAILABLE = True
+    st.info("✅ pdfplumber available as PDF fallback")
+except ImportError:
+    PDFPLUMBER_AVAILABLE = False
 
 st.set_page_config(
     page_title="Form Schema Extractor",
@@ -139,42 +148,138 @@ def convert_pdf_to_image(pdf_bytes, page_num=0, dpi=200):
     if not PYMUPDF_AVAILABLE:
         raise ImportError("PyMuPDF not available")
     
+    pdf_document = None
     try:
+        # Open PDF from bytes
         pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+        page_count = pdf_document.page_count
         
-        if page_num >= pdf_document.page_count:
-            raise ValueError(f"Page {page_num} not found. PDF has {pdf_document.page_count} pages.")
+        if page_num >= page_count:
+            raise ValueError(f"Page {page_num} not found. PDF has {page_count} pages.")
         
+        # Get the page
         page = pdf_document[page_num]
         
         # Calculate zoom factor based on DPI
         zoom = dpi / 72.0  # 72 DPI is default
         mat = fitz.Matrix(zoom, zoom)
         
+        # Render page to pixmap
         pix = page.get_pixmap(matrix=mat)
+        
+        # Convert to PIL Image
         img_data = pix.tobytes("ppm")
         image = Image.open(BytesIO(img_data)).convert("RGB")
         
-        pdf_document.close()
-        return image, pdf_document.page_count
+        # Clean up pixmap
+        pix = None
+        
+        return image, page_count
+        
     except Exception as e:
         logger.error(f"PDF conversion error: {str(e)}")
         raise
+    finally:
+        # Always close the document
+        if pdf_document is not None:
+            try:
+                pdf_document.close()
+            except:
+                pass  # Ignore errors when closing
 
-def extract_pdf_text_with_positions(pdf_bytes, page_num=0):
+def extract_pdf_with_pdfplumber(pdf_bytes):
+    """Alternative PDF text extraction using pdfplumber"""
+    try:
+        import pdfplumber
+        
+        with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
+            if len(pdf.pages) == 0:
+                raise ValueError("PDF has no pages")
+            
+            # Process first page
+            page = pdf.pages[0]
+            
+            # Extract text with bounding boxes
+            chars = page.chars
+            results = []
+            
+            # Group characters into words
+            current_word = ""
+            current_bbox = None
+            word_chars = []
+            
+            for char in chars:
+                if char['text'].strip():  # Non-whitespace character
+                    if current_word == "":  # Start of new word
+                        current_word = char['text']
+                        current_bbox = [char['x0'], char['top'], char['x1'], char['bottom']]
+                        word_chars = [char]
+                    else:  # Continue word
+                        current_word += char['text']
+                        # Expand bounding box
+                        current_bbox[0] = min(current_bbox[0], char['x0'])
+                        current_bbox[1] = min(current_bbox[1], char['top'])
+                        current_bbox[2] = max(current_bbox[2], char['x1'])
+                        current_bbox[3] = max(current_bbox[3], char['bottom'])
+                        word_chars.append(char)
+                else:  # Whitespace - end current word
+                    if current_word.strip() and len(current_word.strip()) >= min_text_length:
+                        results.append({
+                            "text": current_word.strip(),
+                            "bbox": [int(current_bbox[0]), int(current_bbox[1]), 
+                                   int(current_bbox[2]), int(current_bbox[3])],
+                            "confidence": 90,  # High confidence for direct PDF text
+                            "line_num": 1,
+                            "block_num": 1,
+                            "page_num": 1,
+                            "width": int(current_bbox[2] - current_bbox[0]),
+                            "height": int(current_bbox[3] - current_bbox[1])
+                        })
+                    current_word = ""
+                    current_bbox = None
+                    word_chars = []
+            
+            # Don't forget the last word
+            if current_word.strip() and len(current_word.strip()) >= min_text_length:
+                results.append({
+                    "text": current_word.strip(),
+                    "bbox": [int(current_bbox[0]), int(current_bbox[1]), 
+                           int(current_bbox[2]), int(current_bbox[3])],
+                    "confidence": 90,
+                    "line_num": 1,
+                    "block_num": 1,
+                    "page_num": 1,
+                    "width": int(current_bbox[2] - current_bbox[0]),
+                    "height": int(current_bbox[3] - current_bbox[1])
+                })
+            
+            return results, len(pdf.pages)
+            
+    except Exception as e:
+        logger.error(f"pdfplumber extraction error: {str(e)}")
+        raise
     """Extract text with positions from PDF using PyMuPDF"""
     if not PYMUPDF_AVAILABLE:
         raise ImportError("PyMuPDF not available")
     
+    pdf_document = None
     try:
+        # Open PDF from bytes
         pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+        page_count = pdf_document.page_count
+        
+        if page_num >= page_count:
+            raise ValueError(f"Page {page_num} not found. PDF has {page_count} pages.")
+        
+        # Get the page
         page = pdf_document[page_num]
         
+        # Extract text with dictionary format
         text_dict = page.get_text("dict")
         results = []
         
         for block_num, block in enumerate(text_dict["blocks"]):
-            if "lines" in block:
+            if "lines" in block:  # Text block
                 for line_num, line in enumerate(block["lines"]):
                     for span in line["spans"]:
                         text = span["text"].strip()
@@ -183,7 +288,7 @@ def extract_pdf_text_with_positions(pdf_bytes, page_num=0):
                             results.append({
                                 "text": text,
                                 "bbox": [int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])],
-                                "confidence": 95,
+                                "confidence": 95,  # High confidence for direct PDF text
                                 "line_num": line_num + 1,
                                 "block_num": block_num + 1,
                                 "page_num": page_num + 1,
@@ -193,11 +298,18 @@ def extract_pdf_text_with_positions(pdf_bytes, page_num=0):
                                 "font_flags": span.get("flags", 0)
                             })
         
-        pdf_document.close()
-        return results, pdf_document.page_count
+        return results, page_count
+        
     except Exception as e:
         logger.error(f"PDF text extraction error: {str(e)}")
         raise
+    finally:
+        # Always close the document
+        if pdf_document is not None:
+            try:
+                pdf_document.close()
+            except:
+                pass  # Ignore errors when closing
 
 def perform_ocr(image, preprocessed_image):
     """Perform OCR with comprehensive error handling"""
@@ -355,30 +467,65 @@ if uploaded_file is not None:
         if is_pdf:
             st.info("📄 PDF detected. Processing...")
             
-            if PYMUPDF_AVAILABLE:
+            # Show debug info
+            with st.expander("🔍 PDF Debug Info", expanded=False):
+                debug_pdf_file(uploaded_file.getvalue())
+            
+            pdf_processed = False
+            
+            # Method 1: Try PyMuPDF image conversion
+            if PYMUPDF_AVAILABLE and not pdf_processed:
                 try:
-                    # Try to convert PDF to image
-                    image, total_pages = convert_pdf_to_image(uploaded_file.getvalue())
-                    processing_method = f"PDF converted to image (Page 1 of {total_pages})"
+                    with st.spinner("🔄 Converting PDF to image (PyMuPDF)..."):
+                        image, total_pages = convert_pdf_to_image(uploaded_file.getvalue())
+                    processing_method = f"PDF converted to image via PyMuPDF (Page 1 of {total_pages})"
                     st.success(f"✅ {processing_method}")
+                    pdf_processed = True
                     
                     if total_pages > 1:
                         st.info(f"📋 Note: Processing only the first page. PDF has {total_pages} pages total.")
                         
                 except Exception as e:
-                    st.warning(f"⚠️ PDF to image conversion failed: {str(e)}")
-                    
-                    # Fallback to direct text extraction
-                    try:
+                    st.warning(f"⚠️ PyMuPDF image conversion failed: {str(e)}")
+            
+            # Method 2: Try PyMuPDF text extraction
+            if PYMUPDF_AVAILABLE and not pdf_processed:
+                try:
+                    with st.spinner("🔄 Extracting text directly (PyMuPDF)..."):
                         text_results, total_pages = extract_pdf_text_with_positions(uploaded_file.getvalue())
-                        processing_method = f"Direct PDF text extraction (Page 1 of {total_pages})"
-                        st.success(f"✅ {processing_method}")
-                    except Exception as e2:
-                        st.error(f"❌ PDF processing failed completely: {str(e2)}")
-                        st.stop()
-            else:
-                st.error("❌ PDF processing requires PyMuPDF. Please install it or convert PDF to image format.")
-                st.code("pip install PyMuPDF")
+                    processing_method = f"Direct PDF text extraction via PyMuPDF (Page 1 of {total_pages})"
+                    st.success(f"✅ {processing_method}")
+                    pdf_processed = True
+                    
+                    if total_pages > 1:
+                        st.info(f"📋 Note: Processing only the first page. PDF has {total_pages} pages total.")
+                        
+                except Exception as e:
+                    st.warning(f"⚠️ PyMuPDF text extraction failed: {str(e)}")
+            
+            # Method 3: Try pdfplumber as fallback
+            if PDFPLUMBER_AVAILABLE and not pdf_processed:
+                try:
+                    with st.spinner("🔄 Extracting text with pdfplumber..."):
+                        text_results, total_pages = extract_pdf_with_pdfplumber(uploaded_file.getvalue())
+                    processing_method = f"PDF text extraction via pdfplumber (Page 1 of {total_pages})"
+                    st.success(f"✅ {processing_method}")
+                    pdf_processed = True
+                    
+                    if total_pages > 1:
+                        st.info(f"📋 Note: Processing only the first page. PDF has {total_pages} pages total.")
+                        
+                except Exception as e:
+                    st.warning(f"⚠️ pdfplumber extraction failed: {str(e)}")
+            
+            # If all methods failed
+            if not pdf_processed:
+                st.error("❌ All PDF processing methods failed.")
+                st.error("💡 **Possible solutions:**")
+                st.write("• Install PyMuPDF: `pip install PyMuPDF`")
+                st.write("• Install pdfplumber: `pip install pdfplumber`")
+                st.write("• Convert PDF to PNG/JPG manually and re-upload")
+                st.write("• Check if PDF is password protected or corrupted")
                 st.stop()
                 
         else:
