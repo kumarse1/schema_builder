@@ -10,671 +10,249 @@ import requests
 from io import BytesIO
 import os
 import base64
-import logging
-from datetime import datetime
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Check for PyMuPDF availability
+# Try to import fitz (PyMuPDF) as replacement for pdf2image
 try:
-    import fitz  # PyMuPDF
-    PYMUPDF_AVAILABLE = True
-    st.success(f"✅ PyMuPDF version {fitz.version[0]} available")
+    import fitz  # PyMuPDF - alternative to pdf2image that doesn't need poppler
+    FITZ_AVAILABLE = True
 except ImportError:
-    PYMUPDF_AVAILABLE = False
-    st.warning("⚠️ PyMuPDF not available. PDF processing will be limited.")
-
-# Alternative PDF libraries check
-try:
-    import pdfplumber
-    PDFPLUMBER_AVAILABLE = True
-    st.info("✅ pdfplumber available as PDF fallback")
-except ImportError:
-    PDFPLUMBER_AVAILABLE = False
-
-st.set_page_config(
-    page_title="Form Schema Extractor",
-    page_icon="🧾",
-    layout="wide"
-)
+    FITZ_AVAILABLE = False
 
 st.title("🧾 Form Schema Extractor (PDF/Image + PyTesseract + Vision LLM API)")
 
-# --- Configuration sidebar ---
-with st.sidebar:
-    st.header("⚙️ Configuration")
-    
-    # OCR Settings
-    st.subheader("OCR Settings")
-    confidence_threshold = st.slider("Confidence Threshold", 30, 95, 60, 5)
-    min_text_length = st.slider("Minimum Text Length", 1, 5, 2)
-    
-    # Image Processing Settings
-    st.subheader("Image Processing")
-    max_width = st.number_input("Max Image Width", 500, 3000, 2000, 100)
-    max_height = st.number_input("Max Image Height", 500, 3000, 2000, 100)
-    
-    # API Settings
-    st.subheader("API Configuration")
-    vision_llm_api_url = st.text_input(
-        "Vision LLM API URL", 
-        value=os.getenv("VISION_LLM_API_URL", "http://localhost:8000/api/vision")
-    )
-    
-    # Check if credentials are available
-    has_credentials = bool(os.getenv("VISION_LLM_USER") and os.getenv("VISION_LLM_PASSWORD"))
-    st.info(f"API Credentials: {'✅ Available' if has_credentials else '❌ Not configured'}")
-
-# --- Secure API settings ---
+# --- Secure API settings from environment variables ---
+vision_llm_api_url = os.getenv("VISION_LLM_API_URL", "http://localhost:8000/api/vision")
 vision_llm_user = os.getenv("VISION_LLM_USER")
 vision_llm_password = os.getenv("VISION_LLM_PASSWORD")
 
-def validate_image(image):
-    """Validate image properties"""
-    issues = []
+def convert_pdf_to_image(pdf_bytes):
+    """Convert PDF to image using PyMuPDF (no poppler required)"""
+    if not FITZ_AVAILABLE:
+        raise ImportError("PyMuPDF not available. Install with: pip install PyMuPDF")
     
-    if image.size[0] < 200 or image.size[1] < 200:
-        issues.append("Image may be too small for accurate OCR (< 200px)")
-    
-    if image.size[0] > 5000 or image.size[1] > 5000:
-        issues.append("Image is very large and may cause performance issues")
-    
-    # Check if image is mostly blank
-    img_array = np.array(image.convert('L'))
-    if np.std(img_array) < 10:
-        issues.append("Image appears to have very low contrast")
-    
-    return issues
-
-def preprocess_image(image, enhance=True):
-    """Enhanced image preprocessing for better OCR"""
-    img_np = np.array(image)
-    
-    if enhance:
-        # Convert to grayscale
-        if len(img_np.shape) == 3:
-            gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
-        else:
-            gray = img_np
-        
-        # Apply different preprocessing techniques
-        # Method 1: Simple thresholding
-        _, thresh1 = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
-        
-        # Method 2: Adaptive thresholding
-        thresh2 = cv2.adaptiveThreshold(
-            gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
-        )
-        
-        # Method 3: Otsu's thresholding
-        _, thresh3 = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        
-        # Use the one with the most text detected (simple heuristic)
-        methods = [
-            ("Original", gray),
-            ("Simple Threshold", thresh1),
-            ("Adaptive Threshold", thresh2),
-            ("Otsu Threshold", thresh3)
-        ]
-        
-        best_method = methods[0]
-        max_text_regions = 0
-        
-        for name, processed_img in methods:
-            # Quick test to see which method detects more text regions
-            contours, _ = cv2.findContours(
-                processed_img if name != "Original" else cv2.threshold(processed_img, 127, 255, cv2.THRESH_BINARY)[1],
-                cv2.RETR_EXTERNAL, 
-                cv2.CHAIN_APPROX_SIMPLE
-            )
-            text_regions = len([c for c in contours if cv2.contourArea(c) > 50])
-            
-            if text_regions > max_text_regions:
-                max_text_regions = text_regions
-                best_method = (name, processed_img)
-        
-        st.info(f"📊 Best preprocessing method: {best_method[0]}")
-        return best_method[1]
-    else:
-        # Simple grayscale conversion
-        if len(img_np.shape) == 3:
-            return cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
-        return img_np
-
-def convert_pdf_to_image(pdf_bytes, page_num=0, dpi=200):
-    """Convert PDF to image using PyMuPDF with better quality settings"""
-    if not PYMUPDF_AVAILABLE:
-        raise ImportError("PyMuPDF not available")
-    
-    pdf_document = None
     try:
         # Open PDF from bytes
         pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
-        page_count = pdf_document.page_count
         
-        if page_num >= page_count:
-            raise ValueError(f"Page {page_num} not found. PDF has {page_count} pages.")
+        # Get first page
+        page = pdf_document[0]
         
-        # Get the page
-        page = pdf_document[page_num]
-        
-        # Calculate zoom factor based on DPI
-        zoom = dpi / 72.0  # 72 DPI is default
-        mat = fitz.Matrix(zoom, zoom)
-        
-        # Render page to pixmap
-        pix = page.get_pixmap(matrix=mat)
+        # Convert to image (pixmap)
+        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x zoom for better quality
         
         # Convert to PIL Image
         img_data = pix.tobytes("ppm")
         image = Image.open(BytesIO(img_data)).convert("RGB")
         
-        # Clean up pixmap
-        pix = None
-        
-        return image, page_count
-        
+        pdf_document.close()
+        return image
     except Exception as e:
-        logger.error(f"PDF conversion error: {str(e)}")
-        raise
-    finally:
-        # Always close the document
-        if pdf_document is not None:
-            try:
-                pdf_document.close()
-            except:
-                pass  # Ignore errors when closing
+        st.error(f"❌ Error converting PDF: {str(e)}")
+        return None
 
-def extract_pdf_with_pdfplumber(pdf_bytes):
-    """Alternative PDF text extraction using pdfplumber"""
-    try:
-        import pdfplumber
+def fallback_pdf_text_extraction(pdf_bytes):
+    """Fallback: Extract text directly from PDF without image conversion"""
+    if not FITZ_AVAILABLE:
+        raise ImportError("PyMuPDF not available. Install with: pip install PyMuPDF")
         
-        with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
-            if len(pdf.pages) == 0:
-                raise ValueError("PDF has no pages")
-            
-            # Process first page
-            page = pdf.pages[0]
-            
-            # Extract text with bounding boxes
-            chars = page.chars
-            results = []
-            
-            # Group characters into words
-            current_word = ""
-            current_bbox = None
-            word_chars = []
-            
-            for char in chars:
-                if char['text'].strip():  # Non-whitespace character
-                    if current_word == "":  # Start of new word
-                        current_word = char['text']
-                        current_bbox = [char['x0'], char['top'], char['x1'], char['bottom']]
-                        word_chars = [char]
-                    else:  # Continue word
-                        current_word += char['text']
-                        # Expand bounding box
-                        current_bbox[0] = min(current_bbox[0], char['x0'])
-                        current_bbox[1] = min(current_bbox[1], char['top'])
-                        current_bbox[2] = max(current_bbox[2], char['x1'])
-                        current_bbox[3] = max(current_bbox[3], char['bottom'])
-                        word_chars.append(char)
-                else:  # Whitespace - end current word
-                    if current_word.strip() and len(current_word.strip()) >= min_text_length:
-                        results.append({
-                            "text": current_word.strip(),
-                            "bbox": [int(current_bbox[0]), int(current_bbox[1]), 
-                                   int(current_bbox[2]), int(current_bbox[3])],
-                            "confidence": 90,  # High confidence for direct PDF text
-                            "line_num": 1,
-                            "block_num": 1,
-                            "page_num": 1,
-                            "width": int(current_bbox[2] - current_bbox[0]),
-                            "height": int(current_bbox[3] - current_bbox[1])
-                        })
-                    current_word = ""
-                    current_bbox = None
-                    word_chars = []
-            
-            # Don't forget the last word
-            if current_word.strip() and len(current_word.strip()) >= min_text_length:
-                results.append({
-                    "text": current_word.strip(),
-                    "bbox": [int(current_bbox[0]), int(current_bbox[1]), 
-                           int(current_bbox[2]), int(current_bbox[3])],
-                    "confidence": 90,
-                    "line_num": 1,
-                    "block_num": 1,
-                    "page_num": 1,
-                    "width": int(current_bbox[2] - current_bbox[0]),
-                    "height": int(current_bbox[3] - current_bbox[1])
-                })
-            
-            return results, len(pdf.pages)
-            
-    except Exception as e:
-        logger.error(f"pdfplumber extraction error: {str(e)}")
-        raise
-    """Extract text with positions from PDF using PyMuPDF"""
-    if not PYMUPDF_AVAILABLE:
-        raise ImportError("PyMuPDF not available")
-    
-    pdf_document = None
     try:
-        # Open PDF from bytes
         pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
-        page_count = pdf_document.page_count
+        page = pdf_document[0]
         
-        if page_num >= page_count:
-            raise ValueError(f"Page {page_num} not found. PDF has {page_count} pages.")
-        
-        # Get the page
-        page = pdf_document[page_num]
-        
-        # Extract text with dictionary format
+        # Extract text with position information
         text_dict = page.get_text("dict")
-        results = []
         
-        for block_num, block in enumerate(text_dict["blocks"]):
-            if "lines" in block:  # Text block
-                for line_num, line in enumerate(block["lines"]):
+        results = []
+        for block in text_dict["blocks"]:
+            if "lines" in block:
+                for line in block["lines"]:
                     for span in line["spans"]:
                         text = span["text"].strip()
-                        if len(text) >= min_text_length:
-                            bbox = span["bbox"]
+                        if len(text) > 1:
+                            bbox = span["bbox"]  # [x0, y0, x1, y1]
                             results.append({
                                 "text": text,
                                 "bbox": [int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])],
                                 "confidence": 95,  # High confidence for direct PDF text
-                                "line_num": line_num + 1,
-                                "block_num": block_num + 1,
-                                "page_num": page_num + 1,
+                                "line_num": 1,
+                                "block_num": 1,
+                                "page_num": 1,
                                 "width": int(bbox[2] - bbox[0]),
-                                "height": int(bbox[3] - bbox[1]),
-                                "font_size": span.get("size", 0),
-                                "font_flags": span.get("flags", 0)
+                                "height": int(bbox[3] - bbox[1])
                             })
         
-        return results, page_count
-        
+        pdf_document.close()
+        return results, None  # No image available
     except Exception as e:
-        logger.error(f"PDF text extraction error: {str(e)}")
-        raise
-    finally:
-        # Always close the document
-        if pdf_document is not None:
-            try:
-                pdf_document.close()
-            except:
-                pass  # Ignore errors when closing
+        st.error(f"❌ Error extracting text from PDF: {str(e)}")
+        return None, None
 
-def perform_ocr(image, preprocessed_image):
-    """Perform OCR with comprehensive error handling"""
-    try:
-        ocr_data = pytesseract.image_to_data(preprocessed_image, output_type=Output.DICT)
-        n_boxes = len(ocr_data['text'])
-        
-        results = []
-        img_np = np.array(image)
-        
-        for i in range(n_boxes):
-            conf = int(ocr_data['conf'][i])
-            text = ocr_data['text'][i].strip()
-            
-            if conf > confidence_threshold and len(text) >= min_text_length:
-                x, y, w, h = (
-                    ocr_data['left'][i], 
-                    ocr_data['top'][i], 
-                    ocr_data['width'][i], 
-                    ocr_data['height'][i]
-                )
-                
-                results.append({
-                    "text": text,
-                    "bbox": [x, y, x + w, y + h],
-                    "confidence": conf,
-                    "line_num": ocr_data['line_num'][i],
-                    "block_num": ocr_data['block_num'][i],
-                    "page_num": ocr_data['page_num'][i],
-                    "width": w,
-                    "height": h
-                })
-                
-                # Draw bounding box
-                cv2.rectangle(img_np, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                cv2.putText(img_np, f"{conf}%", (x, y-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-        
-        return results, img_np
-    except Exception as e:
-        logger.error(f"OCR error: {str(e)}")
-        raise
-
-def generate_enhanced_prompt(results, form_meta, include_context=True):
-    """Generate an enhanced prompt for the Vision LLM"""
-    context = ""
-    if include_context:
-        context = """
-Additional Context:
-- Look for common form patterns like checkboxes, underlines, brackets, or areas with labels followed by blank spaces
-- Group related fields logically (e.g., personal info, address, medical history)
-- Consider spatial relationships - fields close together are likely related
-- Identify signature areas, date fields, and checkbox groups
-- Pay attention to font sizes and formatting to distinguish labels from input areas
-"""
-    
-    prompt = f"""
-You are a Vision LLM expert at extracting structured form schemas from text extraction data.
-
-TASK: Analyze the extracted text and identify INPUT FIELDS where humans would enter information.
-
-REQUIREMENTS:
-✅ Identify fields that expect human input (not just labels)
-✅ Provide descriptive field names based on nearby labels
-✅ Determine appropriate data types: string, number, date, email, phone, boolean, etc.
-✅ Return bounding boxes for INPUT AREAS (where users write), not label areas
-✅ Group fields into logical sections when possible
-✅ Include confidence scores (1-10) for your field identification
-
-EXCLUSIONS:
-❌ Labels without corresponding input areas
-❌ Titles, headers, and decorative text
-❌ Legal disclaimers and fine print
-❌ Instructions or help text
-❌ Company logos or branding
-
-{context}
-
-Form Metadata:
-{json.dumps(form_meta, indent=2)}
-
-Extracted Text Data:
-{json.dumps(results, indent=2)}
-
-OUTPUT FORMAT:
-Return a JSON object with this structure:
-{{
-  "form_analysis": {{
-    "total_fields_identified": <number>,
-    "processing_notes": "<any observations>",
-    "form_type_guess": "<type of form if identifiable>"
-  }},
-  "fields": [
-    {{
-      "field_name": "<descriptive name>",
-      "data_type": "<string|number|date|email|phone|boolean|select>",
-      "bounding_box": [x1, y1, x2, y2],
-      "section_name": "<logical grouping>",
-      "confidence": <1-10>,
-      "required": <true|false if determinable>,
-      "placeholder_text": "<if any hints about expected format>"
-    }}
-  ]
-}}
-"""
-    return prompt
-
-def call_vision_llm_api(file_bytes, prompt):
-    """Call the Vision LLM API with proper error handling and retries"""
-    try:
-        files = {"image": file_bytes}
-        data = {"prompt": prompt}
-        
-        headers = {}
-        if vision_llm_user and vision_llm_password:
-            # Use basic auth
-            credentials = base64.b64encode(f"{vision_llm_user}:{vision_llm_password}".encode()).decode()
-            headers['Authorization'] = f"Basic {credentials}"
-        
-        # Add timeout and retry logic
-        response = requests.post(
-            vision_llm_api_url, 
-            files=files, 
-            data=data, 
-            headers=headers,
-            timeout=30
-        )
-        response.raise_for_status()
-        return response.json()
-        
-    except requests.exceptions.Timeout:
-        raise Exception("API request timed out (30s)")
-    except requests.exceptions.ConnectionError:
-        raise Exception("Failed to connect to Vision LLM API")
-    except requests.exceptions.HTTPError as e:
-        raise Exception(f"API returned error: {e.response.status_code} - {e.response.text}")
-    except Exception as e:
-        raise Exception(f"Unexpected API error: {str(e)}")
-
-# --- Main App ---
-uploaded_file = st.file_uploader(
-    "📤 Upload a blank form image or PDF", 
-    type=["png", "jpg", "jpeg", "pdf"],
-    help="Supported formats: PNG, JPG, JPEG, PDF. For best results, use high-resolution images with clear text."
-)
+uploaded_file = st.file_uploader("📤 Upload a blank form image or PDF", type=["png", "jpg", "jpeg", "pdf"])
 
 if uploaded_file is not None:
     try:
-        st.success(f"📁 File uploaded: {uploaded_file.name} ({uploaded_file.size:,} bytes)")
-        
         image = None
-        text_results = None
-        is_pdf = uploaded_file.name.lower().endswith(".pdf")
-        processing_method = ""
+        ocr_results = None
+        is_pdf = uploaded_file.name.endswith(".pdf")
         
         if is_pdf:
-            st.info("📄 PDF detected. Processing...")
-            
-            # Show debug info
-            with st.expander("🔍 PDF Debug Info", expanded=False):
-                debug_pdf_file(uploaded_file.getvalue())
-            
-            pdf_processed = False
-            
-            # Method 1: Try PyMuPDF image conversion
-            if PYMUPDF_AVAILABLE and not pdf_processed:
-                try:
-                    with st.spinner("🔄 Converting PDF to image (PyMuPDF)..."):
-                        image, total_pages = convert_pdf_to_image(uploaded_file.getvalue())
-                    processing_method = f"PDF converted to image via PyMuPDF (Page 1 of {total_pages})"
-                    st.success(f"✅ {processing_method}")
-                    pdf_processed = True
-                    
-                    if total_pages > 1:
-                        st.info(f"📋 Note: Processing only the first page. PDF has {total_pages} pages total.")
-                        
-                except Exception as e:
-                    st.warning(f"⚠️ PyMuPDF image conversion failed: {str(e)}")
-            
-            # Method 2: Try PyMuPDF text extraction
-            if PYMUPDF_AVAILABLE and not pdf_processed:
-                try:
-                    with st.spinner("🔄 Extracting text directly (PyMuPDF)..."):
-                        text_results, total_pages = extract_pdf_text_with_positions(uploaded_file.getvalue())
-                    processing_method = f"Direct PDF text extraction via PyMuPDF (Page 1 of {total_pages})"
-                    st.success(f"✅ {processing_method}")
-                    pdf_processed = True
-                    
-                    if total_pages > 1:
-                        st.info(f"📋 Note: Processing only the first page. PDF has {total_pages} pages total.")
-                        
-                except Exception as e:
-                    st.warning(f"⚠️ PyMuPDF text extraction failed: {str(e)}")
-            
-            # Method 3: Try pdfplumber as fallback
-            if PDFPLUMBER_AVAILABLE and not pdf_processed:
-                try:
-                    with st.spinner("🔄 Extracting text with pdfplumber..."):
-                        text_results, total_pages = extract_pdf_with_pdfplumber(uploaded_file.getvalue())
-                    processing_method = f"PDF text extraction via pdfplumber (Page 1 of {total_pages})"
-                    st.success(f"✅ {processing_method}")
-                    pdf_processed = True
-                    
-                    if total_pages > 1:
-                        st.info(f"📋 Note: Processing only the first page. PDF has {total_pages} pages total.")
-                        
-                except Exception as e:
-                    st.warning(f"⚠️ pdfplumber extraction failed: {str(e)}")
-            
-            # If all methods failed
-            if not pdf_processed:
-                st.error("❌ All PDF processing methods failed.")
-                st.error("💡 **Possible solutions:**")
-                st.write("• Install PyMuPDF: `pip install PyMuPDF`")
-                st.write("• Install pdfplumber: `pip install pdfplumber`")
-                st.write("• Convert PDF to PNG/JPG manually and re-upload")
-                st.write("• Check if PDF is password protected or corrupted")
+            if not FITZ_AVAILABLE:
+                st.error("❌ PDF processing requires PyMuPDF. Please install it:")
+                st.code("pip install PyMuPDF")
+                st.error("💡 Or convert your PDF to PNG/JPG format and re-upload.")
                 st.stop()
                 
-        else:
-            # Handle image files
-            try:
-                image = Image.open(BytesIO(uploaded_file.getvalue())).convert("RGB")
-                processing_method = "Image file processed"
-                st.success(f"✅ {processing_method}")
-            except Exception as e:
-                st.error(f"❌ Failed to open image: {str(e)}")
-                st.stop()
-
-        # Process the image if we have one
-        if image:
-            # Validate image
-            validation_issues = validate_image(image)
-            if validation_issues:
-                st.warning("⚠️ Image validation issues:")
-                for issue in validation_issues:
-                    st.write(f"  • {issue}")
+            st.info("📄 PDF detected. Attempting to process...")
             
-            # Resize if needed
-            max_size = (max_width, max_height)
-            original_size = image.size
+            # Try PyMuPDF first (Method 1)
+            try:
+                image = convert_pdf_to_image(uploaded_file.getvalue())
+                if image:
+                    st.success("✅ PDF converted to image using PyMuPDF")
+                else:
+                    raise Exception("PyMuPDF conversion failed")
+            except Exception as e:
+                st.warning(f"⚠️ PyMuPDF conversion failed: {str(e)}")
+                
+                # Fallback: Direct text extraction (Method 2)
+                st.info("🔄 Trying direct PDF text extraction...")
+                ocr_results, _ = fallback_pdf_text_extraction(uploaded_file.getvalue())
+                
+                if ocr_results:
+                    st.success("✅ Text extracted directly from PDF")
+                else:
+                    # Final fallback: Skip PDF processing (Method 3)
+                    st.error("❌ Unable to process PDF. Please convert to image format (PNG/JPG) and re-upload.")
+                    st.stop()
+        else:
+            # Handle regular images
+            image = Image.open(BytesIO(uploaded_file.getvalue())).convert("RGB")
+
+        # Process image if available
+        if image:
+            # Validate image size
+            max_size = (2000, 2000)
             if image.size[0] > max_size[0] or image.size[1] > max_size[1]:
                 image.thumbnail(max_size, Image.Resampling.LANCZOS)
-                st.info(f"📐 Image resized from {original_size} to {image.size}")
+                st.info("📐 Image resized for better performance.")
+            elif image.size[0] < 200 or image.size[1] < 200:
+                st.warning("⚠️ Image may be too small for accurate OCR.")
 
-            # Show original image
-            col1, col2 = st.columns(2)
-            with col1:
-                st.subheader("📷 Original Image")
-                st.image(image, caption="Uploaded image", use_container_width=True)
+            img_np = np.array(image)
 
-            # Preprocess image
-            with st.spinner("🔄 Preprocessing image..."):
-                preprocessed = preprocess_image(image, enhance=True)
-            
-            with col2:
-                st.subheader("🔍 Preprocessed Image")
-                st.image(preprocessed, caption="Preprocessed for OCR", use_container_width=True)
+            # --- Step 1: Preprocess Image ---
+            gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+            _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
 
-            # Perform OCR
-            with st.spinner("🔤 Performing OCR..."):
-                text_results, annotated_image = perform_ocr(image, preprocessed)
+            # --- Step 2: Generate Unique ID for the Form ---
+            form_bytes = image.tobytes()
+            form_hash = hashlib.md5(form_bytes).hexdigest()
+            st.success(f"📄 Unique Form ID (MD5): {form_hash}")
 
-            # Show OCR results
-            st.subheader("📝 OCR Results")
-            st.image(annotated_image, caption="Detected text with confidence scores", use_container_width=True)
+            # --- Step 3: OCR with bounding boxes and context ---
+            ocr_data = pytesseract.image_to_data(thresh, output_type=Output.DICT)
+            n_boxes = len(ocr_data['text'])
 
-        # Process results (from either OCR or direct PDF extraction)
-        if text_results:
-            st.success(f"🎯 Extracted {len(text_results)} text elements")
-            
+            ocr_results = []
+            for i in range(n_boxes):
+                conf = int(ocr_data['conf'][i])
+                text = ocr_data['text'][i].strip()
+                if conf > 60 and len(text) > 1:
+                    x, y, w, h = ocr_data['left'][i], ocr_data['top'][i], ocr_data['width'][i], ocr_data['height'][i]
+                    ocr_results.append({
+                        "text": text,
+                        "bbox": [x, y, x + w, y + h],
+                        "confidence": conf,
+                        "line_num": ocr_data['line_num'][i],
+                        "block_num": ocr_data['block_num'][i],
+                        "page_num": ocr_data['page_num'][i],
+                        "width": w,
+                        "height": h
+                    })
+                    cv2.rectangle(img_np, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+            st.image(img_np, caption="Detected text with bounding boxes", channels="RGB")
+
+        # Process results (whether from OCR or direct PDF extraction)
+        if ocr_results:
+            st.subheader("🔍 Text Extraction Results")
+            st.json(ocr_results)
+
             # Generate form metadata
-            timestamp = datetime.now().isoformat()
             if image:
                 form_bytes = image.tobytes()
                 form_hash = hashlib.md5(form_bytes).hexdigest()
                 form_meta = {
                     "form_id": form_hash,
-                    "processing_method": processing_method,
                     "image_width": image.width,
                     "image_height": image.height,
-                    "num_text_elements": len(text_results),
-                    "confidence_threshold": confidence_threshold,
-                    "timestamp": timestamp
+                    "num_ocr_entries": len(ocr_results)
                 }
             else:
+                # For direct PDF text extraction
                 form_hash = hashlib.md5(uploaded_file.getvalue()).hexdigest()
                 form_meta = {
                     "form_id": form_hash,
-                    "processing_method": processing_method,
                     "source": "direct_pdf_extraction",
-                    "num_text_elements": len(text_results),
-                    "timestamp": timestamp
+                    "num_text_entries": len(ocr_results)
                 }
 
-            # Show extracted text data
-            with st.expander("🔍 View Extracted Text Data", expanded=False):
-                st.json(text_results)
+            prompt = f"""
+You are a Vision LLM helping extract structured form schema from text extraction data.
 
-            # Generate enhanced prompt
-            prompt = generate_enhanced_prompt(text_results, form_meta)
-            
-            with st.expander("🧠 View Generated Prompt", expanded=False):
-                st.code(prompt, language="text")
+Text data was extracted from a blank form template. Your goal is to:
+✅ Identify fields that a human would be expected to fill in
+✅ Provide the field name (as labeled on the form)
+✅ Determine the data type (string, number, date, etc.)
+✅ Return the exact bounding box that represents the user-input area — not the label
+✅ If possible, assign a logical section name (e.g., 'Member Info', 'Dependent Info', 'Signature') based on headings, titles, or spatial grouping
 
-            # Call Vision LLM API
-            if st.button("🚀 Extract Form Schema", type="primary"):
-                if not vision_llm_api_url:
-                    st.error("❌ Vision LLM API URL not configured")
-                else:
-                    try:
-                        with st.spinner("🤖 Calling Vision LLM API..."):
-                            response = call_vision_llm_api(uploaded_file.getvalue(), prompt)
-                            
-                        st.success("✅ Form schema extracted successfully!")
-                        
-                        # Display results in a nice format
-                        col1, col2 = st.columns([2, 1])
-                        
-                        with col1:
-                            st.subheader("📋 Extracted Form Schema")
-                            st.json(response)
-                        
-                        with col2:
-                            st.subheader("📊 Quick Stats")
-                            if isinstance(response, dict) and "fields" in response:
-                                st.metric("Total Fields", len(response["fields"]))
-                                
-                                # Group by section
-                                sections = {}
-                                for field in response["fields"]:
-                                    section = field.get("section_name", "Other")
-                                    sections[section] = sections.get(section, 0) + 1
-                                
-                                st.write("**Fields by Section:**")
-                                for section, count in sections.items():
-                                    st.write(f"• {section}: {count}")
-                        
-                        # Provide download option
-                        result_json = json.dumps(response, indent=2)
-                        st.download_button(
-                            label="💾 Download Schema JSON",
-                            data=result_json,
-                            file_name=f"form_schema_{form_hash[:8]}.json",
-                            mime="application/json"
-                        )
-                        
-                    except Exception as e:
-                        st.error(f"❌ Vision LLM API call failed: {str(e)}")
-                        st.info(f"💡 Check your API configuration and ensure the service is running at: {vision_llm_api_url}")
+You are also given line numbers, block numbers, and page numbers. Use these to group related fields into logical sections or detect if the form spans multiple pages.
+
+❌ Do NOT return bounding boxes for labels only (e.g., 'Patient Name')
+❌ Do NOT include decorative text or titles
+❌ Do NOT guess values — only infer where the input is expected
+❌ Exclude paragraphs or blocks of legal disclaimers, instructions, or small-font text commonly found in footers or margins
+
+Form Metadata:
+{json.dumps(form_meta, indent=2)}
+
+Input Text Extraction JSON:
+{json.dumps(ocr_results, indent=2)}
+
+Return your output as a JSON array of objects with these fields:
+- field_name
+- data_type
+- bounding_box
+- section_name (optional but recommended if identifiable)
+"""
+
+            st.subheader("🧠 Prompt for Vision LLM")
+            st.code(prompt, language="text")
+
+            # --- Step 5: Send to Vision LLM API ---
+            if st.button("🚀 Call Vision LLM API"):
+                try:
+                    file_bytes = uploaded_file.getvalue()
+                    files = {"image": file_bytes}
+                    data = {"prompt": prompt}
+
+                    headers = {}
+                    if vision_llm_user and vision_llm_password:
+                        # Fix: Proper basic auth encoding
+                        credentials = base64.b64encode(f"{vision_llm_user}:{vision_llm_password}".encode()).decode()
+                        headers['Authorization'] = f"Basic {credentials}"
+
+                    with st.spinner("Calling Vision LLM..."):
+                        response = requests.post(vision_llm_api_url, files=files, data=data, headers=headers, timeout=30)
+                        response.raise_for_status()
+                        st.subheader("📦 Vision LLM Response")
+                        st.json(response.json())
+                except requests.exceptions.RequestException as e:
+                    st.error(f"❌ Vision LLM API call failed: {e}")
         else:
-            st.warning("⚠️ No text detected. Try:")
-            st.write("• A clearer, higher-resolution image")
-            st.write("• Adjusting the confidence threshold in the sidebar")
-            st.write("• Different image preprocessing settings")
+            st.warning("⚠️ No text detected. Try a clearer image or different form.")
 
     except Exception as e:
-        st.error(f"❌ Unexpected error: {str(e)}")
-        st.error("💡 Please try again with a different file or check the logs for more details.")
-        logger.exception("Unexpected error in main processing")
-
-# --- Footer ---
-st.markdown("---")
-st.markdown("""
-<div style='text-align: center; color: #666;'>
-    <p>🧾 Form Schema Extractor | Built with Streamlit & PyTesseract</p>
-    <p><small>For best results, use high-resolution images with clear, dark text on light backgrounds.</small></p>
-</div>
-""", unsafe_allow_html=True)
+        st.error(f"❌ Error processing file: {str(e)}")
+        st.error("💡 If this is a PDF, try converting it to PNG/JPG format first.")
