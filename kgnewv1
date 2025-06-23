@@ -1,0 +1,400 @@
+streamlit==1.28.1
+langgraph==0.0.26
+langchain==0.0.340
+plotly==5.17.0
+networkx==3.1
+spacy==3.7.2
+pandas==2.1.1
+requests==2.31.0
+pyvis==0.3.2
+python-docx==0.8.11
+openpyxl==3.1.2
+
+
+
+import streamlit as st
+import pandas as pd
+import networkx as nx
+import plotly.graph_objects as go
+import json
+import re
+import requests
+from typing import List, Dict, TypedDict
+import spacy
+from pyvis.network import Network
+import tempfile
+import os
+from docx import Document
+import io
+
+# LangGraph imports
+from langgraph.graph import StateGraph, END
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+st.set_page_config(page_title="Knowledge Graph POC", layout="wide")
+
+# LangGraph State
+class KGState(TypedDict):
+    text: str
+    entities: List[Dict]
+    relationships: List[Dict]
+
+# Simple LLM API call
+def call_llm_api(prompt: str, api_url: str, username: str, password: str, model: str = "") -> str:
+    """Call any LLM API with basic auth"""
+    try:
+        payload = {"prompt": prompt, "max_tokens": 800, "temperature": 0.1}
+        if model:
+            payload["model"] = model
+            
+        response = requests.post(
+            api_url, 
+            json=payload, 
+            auth=(username, password),
+            headers={"Content-Type": "application/json"},
+            timeout=60
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result.get("response", result.get("text", result.get("output", "")))
+        else:
+            st.error(f"API Error: {response.status_code}")
+            return ""
+    except Exception as e:
+        st.error(f"API failed: {e}")
+        return ""
+
+# Document processing
+def extract_text_from_file(uploaded_file) -> str:
+    """Extract text from uploaded file"""
+    try:
+        if uploaded_file.type == "text/plain":
+            return uploaded_file.read().decode('utf-8')
+        elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+            doc = Document(io.BytesIO(uploaded_file.read()))
+            return "\n".join([p.text for p in doc.paragraphs])
+        elif "spreadsheet" in uploaded_file.type or "excel" in uploaded_file.type:
+            df = pd.read_excel(io.BytesIO(uploaded_file.read()))
+            return df.to_string()
+        else:
+            st.error(f"Unsupported file type: {uploaded_file.type}")
+            return ""
+    except Exception as e:
+        st.error(f"Error reading file: {e}")
+        return ""
+
+# Knowledge Graph Generator
+class KGGenerator:
+    def __init__(self, api_url: str, username: str, password: str, model: str = ""):
+        self.api_url = api_url
+        self.username = username  
+        self.password = password
+        self.model = model
+        self.nlp = self._load_spacy()
+        self.workflow = self._create_workflow()
+    
+    def _load_spacy(self):
+        try:
+            return spacy.load("en_core_web_sm")
+        except:
+            st.warning("SpaCy model not found. Install: python -m spacy download en_core_web_sm")
+            return None
+    
+    def _create_workflow(self):
+        workflow = StateGraph(KGState)
+        workflow.add_node("extract_entities", self._extract_entities)
+        workflow.add_node("extract_relationships", self._extract_relationships)
+        workflow.set_entry_point("extract_entities")
+        workflow.add_edge("extract_entities", "extract_relationships")
+        workflow.add_edge("extract_relationships", END)
+        return workflow.compile()
+    
+    def _extract_entities(self, state: KGState) -> KGState:
+        all_entities = []
+        
+        # Process full text in chunks to avoid missing content
+        splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
+        chunks = splitter.split_text(state["text"])
+        
+        for i, chunk in enumerate(chunks):
+            entities = []
+            
+            # SpaCy NER for each chunk
+            if self.nlp:
+                doc = self.nlp(chunk)
+                for ent in doc.ents:
+                    if len(ent.text.strip()) > 2:
+                        entities.append({
+                            "name": ent.text.strip(),
+                            "type": ent.label_,
+                            "confidence": 0.8,
+                            "chunk": i
+                        })
+            
+            # LLM extraction for each chunk
+            prompt = f"""Extract entities for knowledge graph. Only extract what's explicitly mentioned.
+
+ENTITY TYPES: PERSON, ORGANIZATION, SYSTEM, TECHNOLOGY, FEATURE, CONCEPT, PRODUCT
+
+TEXT CHUNK {i+1}: {chunk}
+
+Return JSON: {{"entities": [{{"name": "entity_name", "type": "TYPE"}}]}}
+
+JSON:"""
+            
+            try:
+                result = call_llm_api(prompt, self.api_url, self.username, self.password, self.model)
+                json_match = re.search(r'\{.*\}', result, re.DOTALL)
+                if json_match:
+                    data = json.loads(json_match.group())
+                    for entity in data.get("entities", []):
+                        entity["chunk"] = i
+                        entities.append(entity)
+            except Exception as e:
+                st.warning(f"LLM entity extraction failed for chunk {i+1}: {e}")
+            
+            all_entities.extend(entities)
+        
+        # Deduplicate entities across chunks
+        seen_entities = {}
+        for entity in all_entities:
+            name_lower = entity["name"].lower()
+            if name_lower not in seen_entities:
+                seen_entities[name_lower] = entity
+        
+        state["entities"] = list(seen_entities.values())
+        return state
+    
+    def _extract_relationships(self, state: KGState) -> KGState:
+        all_relationships = []
+        entity_names = [e["name"] for e in state["entities"]]
+        
+        if len(entity_names) < 2:
+            state["relationships"] = []
+            return state
+        
+        # Process full text in chunks for relationships
+        splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
+        chunks = splitter.split_text(state["text"])
+        
+        for i, chunk in enumerate(chunks):
+            # Find which entities appear in this chunk
+            chunk_entities = []
+            for entity_name in entity_names:
+                if entity_name.lower() in chunk.lower():
+                    chunk_entities.append(entity_name)
+            
+            if len(chunk_entities) < 2:
+                continue  # Need at least 2 entities to form relationships
+            
+            prompt = f"""Find relationships between entities. Only extract what's explicitly stated in this text.
+
+ENTITIES IN THIS CHUNK: {', '.join(chunk_entities[:15])}
+RELATIONSHIP TYPES: USES, MANAGES, CONTAINS, REQUIRES, CREATES, PART_OF, DEPENDS_ON
+
+TEXT CHUNK {i+1}: {chunk}
+
+Return JSON: {{"relationships": [{{"source": "entity1", "target": "entity2", "relation": "TYPE"}}]}}
+
+JSON:"""
+            
+            try:
+                result = call_llm_api(prompt, self.api_url, self.username, self.password, self.model)
+                json_match = re.search(r'\{.*\}', result, re.DOTALL)
+                if json_match:
+                    data = json.loads(json_match.group())
+                    for rel in data.get("relationships", []):
+                        if (rel.get("source") in entity_names and 
+                            rel.get("target") in entity_names and
+                            rel.get("source") != rel.get("target")):
+                            rel["chunk"] = i
+                            all_relationships.append(rel)
+            except Exception as e:
+                st.warning(f"LLM relationship extraction failed for chunk {i+1}: {e}")
+        
+        # Deduplicate relationships
+        seen_relationships = set()
+        unique_relationships = []
+        for rel in all_relationships:
+            # Create a unique key for the relationship
+            key = (rel["source"].lower(), rel["target"].lower(), rel["relation"])
+            if key not in seen_relationships:
+                seen_relationships.add(key)
+                unique_relationships.append(rel)
+        
+        state["relationships"] = unique_relationships
+        return state
+    
+    def process(self, text: str) -> KGState:
+        # Process the FULL text - don't truncate for POC
+        st.info(f"📄 Processing {len(text)} characters across multiple chunks...")
+        
+        initial_state = KGState(text=text, entities=[], relationships=[])
+        return self.workflow.invoke(initial_state)
+
+# Visualization
+def create_pyvis_graph(entities, relationships):
+    """Create interactive PyVis graph"""
+    net = Network(height="600px", width="100%", bgcolor="#222222", font_color="white")
+    
+    # Add nodes
+    for entity in entities:
+        color = {"PERSON": "#ff6b6b", "ORGANIZATION": "#4ecdc4", "SYSTEM": "#45b7d1"}.get(entity["type"], "#ddd")
+        net.add_node(entity["name"], label=entity["name"], color=color, size=25)
+    
+    # Add edges  
+    for rel in relationships:
+        if rel["source"] in [e["name"] for e in entities] and rel["target"] in [e["name"] for e in entities]:
+            net.add_edge(rel["source"], rel["target"], label=rel["relation"], width=3)
+    
+    net.set_options('{"physics": {"enabled": true}}')
+    
+    # Save to temp file
+    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".html")
+    net.save_graph(tmp_file.name)
+    return tmp_file.name
+
+def create_plotly_graph(entities, relationships):
+    """Create Plotly graph"""
+    if not entities:
+        return go.Figure().add_annotation(text="No entities found", x=0.5, y=0.5)
+    
+    G = nx.Graph()
+    for entity in entities:
+        G.add_node(entity["name"])
+    for rel in relationships:
+        if rel["source"] in [e["name"] for e in entities] and rel["target"] in [e["name"] for e in entities]:
+            G.add_edge(rel["source"], rel["target"])
+    
+    if not G.nodes():
+        return go.Figure().add_annotation(text="No valid graph", x=0.5, y=0.5)
+    
+    pos = nx.spring_layout(G)
+    
+    edge_x, edge_y = [], []
+    for edge in G.edges():
+        x0, y0 = pos[edge[0]]
+        x1, y1 = pos[edge[1]]
+        edge_x.extend([x0, x1, None])
+        edge_y.extend([y0, y1, None])
+    
+    node_x = [pos[node][0] for node in G.nodes()]
+    node_y = [pos[node][1] for node in G.nodes()]
+    
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=edge_x, y=edge_y, mode='lines', line=dict(width=1, color='gray'), hoverinfo='none'))
+    fig.add_trace(go.Scatter(x=node_x, y=node_y, mode='markers+text', text=list(G.nodes()), 
+                           textposition="middle center", marker=dict(size=20, color='lightblue')))
+    
+    fig.update_layout(showlegend=False, xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                     yaxis=dict(showgrid=False, zeroline=False, showticklabels=False), height=500)
+    return fig
+
+# Main App
+def main():
+    st.title("🧠 Knowledge Graph POC")
+    st.markdown("Upload document → Extract with LangGraph → Visualize with PyVis")
+    
+    # Sidebar
+    with st.sidebar:
+        st.header("⚙️ Configuration")
+        
+        # API Config
+        st.subheader("🔌 LLM API")
+        provider = st.selectbox("Provider", ["Llama", "Mistral", "Other"])
+        api_url = st.text_input("API URL", placeholder="https://api.example.com/generate")
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        model = st.text_input("Model", value="llama2" if provider == "Llama" else "mistral-7b")
+        
+        # Test API
+        if api_url and username and password and st.button("🔍 Test API"):
+            response = call_llm_api("Say 'working'", api_url, username, password, model)
+            if response:
+                st.success("✅ API working!")
+            else:
+                st.error("❌ API failed")
+        
+        # Filters
+        st.subheader("🎛️ Filters")
+        entity_types = st.multiselect("Entity Types", 
+                                    ["PERSON", "ORGANIZATION", "SYSTEM", "TECHNOLOGY", "FEATURE", "CONCEPT", "PRODUCT"],
+                                    default=["PERSON", "ORGANIZATION", "SYSTEM"])
+    
+    # Main Area
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.subheader("📁 Upload Document")
+        uploaded_file = st.file_uploader("Choose file", type=['txt', 'docx', 'xlsx'])
+        
+        if uploaded_file:
+            text = extract_text_from_file(uploaded_file)
+            if text:
+                st.success(f"✅ Extracted {len(text)} characters")
+                
+                with st.expander("📄 Preview"):
+                    st.text_area("Content", text[:300] + "...", height=100)
+                
+                if api_url and username and password and st.button("🚀 Generate KG", type="primary"):
+                    with st.spinner("Processing..."):
+                        kg_gen = KGGenerator(api_url, username, password, model)
+                        result = kg_gen.process(text)
+                        
+                        # Filter results
+                        filtered_entities = [e for e in result["entities"] if e.get("type") in entity_types]
+                        filtered_relationships = result["relationships"]
+                        
+                        st.session_state.entities = filtered_entities
+                        st.session_state.relationships = filtered_relationships
+                        
+                        st.success(f"✅ Found {len(filtered_entities)} entities, {len(filtered_relationships)} relationships")
+    
+    with col2:
+        if 'entities' in st.session_state:
+            st.subheader("📊 Knowledge Graph")
+            
+            tab1, tab2 = st.tabs(["🎨 PyVis Interactive", "📈 Plotly"])
+            
+            with tab1:
+                if st.session_state.entities:
+                    pyvis_file = create_pyvis_graph(st.session_state.entities, st.session_state.relationships)
+                    with open(pyvis_file, 'r') as f:
+                        html_content = f.read()
+                    st.components.v1.html(html_content, height=600)
+                    os.unlink(pyvis_file)
+                else:
+                    st.info("No entities to visualize")
+            
+            with tab2:
+                fig = create_plotly_graph(st.session_state.entities, st.session_state.relationships)
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("👆 Upload a document and generate knowledge graph")
+    
+    # Results
+    if 'entities' in st.session_state:
+        st.subheader("📋 Results")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("**Entities**")
+            if st.session_state.entities:
+                df = pd.DataFrame([{"Name": e["name"], "Type": e["type"]} for e in st.session_state.entities])
+                st.dataframe(df, use_container_width=True)
+        
+        with col2:
+            st.write("**Relationships**")
+            if st.session_state.relationships:
+                df = pd.DataFrame([{"Source": r["source"], "Relation": r["relation"], "Target": r["target"]} 
+                                 for r in st.session_state.relationships])
+                st.dataframe(df, use_container_width=True)
+        
+        # Export
+        if st.button("📥 Export JSON"):
+            data = {"entities": st.session_state.entities, "relationships": st.session_state.relationships}
+            st.download_button("Download", json.dumps(data, indent=2), "knowledge_graph.json", "application/json")
+
+if __name__ == "__main__":
+    main()
