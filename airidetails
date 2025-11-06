@@ -1,0 +1,966 @@
+
+
+---
+
+## 🎯 **Presentation Framework: The 3-Layer Story**
+
+ 
+
+### **The Problem:**
+"Our support teams solve the same problems repeatedly. Knowledge is trapped in individual team members' heads or scattered across thousands of old tickets."
+
+### **The Solution:**
+"When someone asks a question, our system:
+1. Finds similar past tickets (with % match)
+2. Shows relevant SOPs (step-by-step procedures)
+3. If no SOP exists, auto-generates one from patterns"
+
+### **The Flow (Simple Diagram):**
+```
+User Question
+    ↓
+Search Historic Tickets (show matches)
+    ↓
+Search SOPs (show procedures)
+    ↓
+No SOP? → Auto-Generate from Patterns
+    ↓
+User Gets Answer
+```
+
+### **Business Value:**
+- Faster problem resolution
+- Consistent procedures
+- Knowledge retention
+- Self-service capability
+
+**Stop here for executives. Move to Layer 2 for product/business stakeholders.**
+
+---
+
+## **LAYER 2: The System Flow (10 minutes)**
+*How the magic happens - for product managers, analysts, business stakeholders*
+
+### **Three Core Capabilities:**
+
+#### **Capability 1: Smart Search** 🔍
+- User asks: "login timeout issues"
+- System finds: "authentication failures", "can't sign in", "credential timeout"
+- Works even with different words (semantic understanding)
+
+**What enables this:**
+- Historic tickets with embeddings (mathematical representations)
+- Similarity matching (finds conceptually similar, not just keyword match)
+
+---
+
+#### **Capability 2: Knowledge Base** 📚
+- Searchable library of procedures (SOPs)
+- Two types:
+  - Expert-written (high-stakes procedures)
+  - Auto-generated (AI creates from patterns)
+- Always shows relevant procedure for the question
+
+**What enables this:**
+- SOP storage with embeddings
+- Semantic search across procedures
+
+---
+
+#### **Capability 3: Pattern Recognition** 🎯
+- System identifies recurring issues automatically
+- Groups similar tickets together (clustering)
+- Detects trending issues ("authentication problems spiking!")
+- Generates new SOPs from patterns
+
+**What enables this:**
+- Machine learning clustering
+- Trending analysis
+- Auto-generation from patterns
+
+---
+
+### **The Complete Flow (Detailed Diagram):**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ USER ASKS QUESTION: "How do I fix Redis timeout?"          │
+└────────────────────┬────────────────────────────────────────┘
+                     ↓
+         ┌───────────────────────┐
+         │ Convert to Embedding  │ (Mathematical representation)
+         └───────────┬───────────┘
+                     ↓
+         ┌───────────────────────────────┐
+         │ Search Historic Tickets       │
+         │ - INC123: Redis timeout (89%) │
+         │ - INC456: Cache timeout (85%) │
+         │ - INC789: Redis crash (78%)   │
+         └───────────┬───────────────────┘
+                     │
+                     ├────────────────────────────────┐
+                     ↓                                ↓
+         ┌───────────────────────┐      ┌─────────────────────────┐
+         │ Search SOPs           │      │ Check Patterns          │
+         │ Found: "Redis         │      │ Cluster #7: Redis       │
+         │ Troubleshooting"      │      │ issues (47 tickets)     │
+         │ (87% match)           │      │                         │
+         └───────────┬───────────┘      └─────────┬───────────────┘
+                     │                            │
+                     ↓                            ↓
+         ┌───────────────────────┐      ┌─────────────────────────┐
+         │ Display to User       │      │ If trending: Alert team │
+         │ - Similar tickets     │      │ If no SOP: Generate one │
+         │ - SOP procedure       │      └─────────────────────────┘
+         │ - Match %             │
+         └───────────────────────┘
+```
+
+**Stop here for most audiences. Move to Layer 3 only for technical stakeholders.**
+
+---
+
+## **LAYER 3: The Technical Architecture (15 minutes)**
+*Database structure - for developers, architects, data engineers*
+
+### **The 9 Tables in 3 Groups:**
+
+---
+
+### **GROUP 1: SEARCH & RETRIEVAL** (What users see)
+
+| Table | Purpose | Key Point |
+|-------|---------|-----------|
+| `tickets` | Historic ticket data | Metadata only - fast queries |
+| `ticket_embeddings` | Search capability | **SEPARATE** for performance (12KB each) |
+| `standard_operating_procedures` | Knowledge base | SOPs with metadata |
+| `sop_embeddings` | SOP search | **SEPARATE** for performance |
+
+**Why separate embeddings?**
+- Main tables stay small = fast metadata queries
+- Only load embeddings when searching
+- 1M tickets: 2GB (metadata) vs 14GB (with embeddings mixed in)
+
+---
+
+### **GROUP 2: PATTERN ANALYSIS** (Behind the scenes intelligence)
+
+| Table | Purpose | Key Point |
+|-------|---------|-----------|
+| `ticket_clusters` | Groups of similar issues | ML identifies patterns |
+| `ticket_cluster_assignments` | Ticket → Cluster mapping | Many-to-many relationship |
+| `trending_issues` | Real-time spike detection | Materialized view (fast queries) |
+
+**Why this matters:**
+- Auto-detect "authentication issues spiking"
+- Generate SOPs from patterns
+- Proactive alerting
+
+---
+
+### **GROUP 3: LEARNING & IMPROVEMENT** (Getting smarter over time)
+
+| Table | Purpose | Key Point |
+|-------|---------|-----------|
+| `search_queries` | Track every search | Identify gaps, measure quality |
+| `sop_generation_history` | How SOPs were created | Audit trail, reproducibility |
+
+**Why this matters:**
+- "Users searched for X 20 times but we have no answer" → Create SOP
+- "This auto-generated SOP came from these 5 tickets" → Reproducible
+- Search quality trending up over time
+
+---
+
+### **The 3-Group Visual:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    GROUP 1: SEARCH                           │
+│  ┌────────────┐              ┌──────────────────┐           │
+│  │  tickets   │──────────────│ ticket_embeddings│           │
+│  └────────────┘   separate   └──────────────────┘           │
+│                     for                                      │
+│  ┌────────────┐  performance ┌──────────────────┐           │
+│  │    SOPs    │──────────────│  sop_embeddings  │           │
+│  └────────────┘              └──────────────────┘           │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                GROUP 2: PATTERN ANALYSIS                     │
+│  ┌──────────────────┐                                        │
+│  │ ticket_clusters  │  ← ML groups similar tickets          │
+│  └────────┬─────────┘                                        │
+│           │                                                  │
+│  ┌────────▼──────────────────┐                              │
+│  │ ticket_cluster_assignments│  ← Links tickets to patterns │
+│  └───────────────────────────┘                              │
+│                                                              │
+│  ┌──────────────────┐                                       │
+│  │ trending_issues  │  ← What's spiking right now          │
+│  └──────────────────┘                                       │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│              GROUP 3: LEARNING & IMPROVEMENT                 │
+│  ┌─────────────────┐                                        │
+│  │ search_queries  │  ← What users are looking for         │
+│  └─────────────────┘                                        │
+│                                                              │
+│  ┌─────────────────────────┐                                │
+│  │ sop_generation_history  │  ← How SOPs were made         │
+│  └─────────────────────────┘                                │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📊 **Recommended Presentation Flow**
+
+### **For Mixed Audience (Execs + Technical):**
+
+**Slide 1-2: The Problem & Vision** (Layer 1 - User Story)
+- Current pain points
+- The user experience we're building
+- Business value
+
+**Slide 3-4: How It Works** (Layer 2 - System Flow)
+- The 3 core capabilities
+- Complete user journey diagram
+- Examples with real scenarios
+
+**Slide 5-6: Technical Architecture** (Layer 3 - High Level)
+- The 9 tables in 3 groups
+- Why separate embeddings (performance story)
+- Key design decisions
+
+**Slide 7: Implementation Plan**
+- Phase 1: Search & Retrieval (Group 1 tables)
+- Phase 2: Pattern Analysis (Group 2 tables)
+- Phase 3: Learning System (Group 3 tables)
+
+---
+
+## 🎯 **The One-Page Summary (Leave-Behind)**
+
+### **What We're Building:**
+Intelligent search system for historic tickets + automated knowledge base
+
+### **Core Capabilities:**
+1. **Smart Search** - Finds similar past issues even with different words
+2. **Knowledge Base** - Shows step-by-step procedures (SOPs)
+3. **Pattern Recognition** - Auto-detects trending issues & generates SOPs
+
+### **Database Structure (9 Tables in 3 Groups):**
+
+**Search & Retrieval (4 tables):**
+- Historic tickets + embeddings (semantic search)
+- SOPs + embeddings (procedure search)
+
+**Pattern Analysis (3 tables):**
+- Clustering (group similar issues)
+- Trending detection (what's spiking)
+- Ticket-to-pattern mapping
+
+**Learning & Improvement (2 tables):**
+- Search logs (what users want)
+- SOP generation audit (how it was made)
+
+### **Key Design Decision:**
+Embeddings in **separate tables** for performance
+- Main tables: fast metadata queries
+- Embeddings: only load for search
+- 10x faster for non-search operations
+
+### **Implementation:**
+- Phase 1: Search (4-6 weeks)
+- Phase 2: Patterns (2-3 weeks)
+- Phase 3: Learning (2 weeks)
+
+---
+
+## 💡 **Pro Tips for Your Presentation:**
+
+### **1. Start with the "Why"**
+Before ANY technical detail:
+- "We answer the same questions 100 times"
+- "Knowledge walks out the door when employees leave"
+- "New hires take 6 months to become productive"
+
+### **2. Use the "Show, Don't Tell" Approach**
+Live demo or mockup:
+- Type a question
+- Show results appearing
+- Point out match percentages
+- Show the SOP
+
+### **3. Use Analogies for Non-Technical Folks**
+- **Embeddings:** "Like converting books into library catalog numbers - different books about the same topic get similar numbers"
+- **Clustering:** "Like your email app automatically grouping 'receipts' or 'newsletters' together"
+- **Tags:** "Like sticky notes on a file - add multiple dimensions of context"
+
+### **4. Answer "So What?" at Each Level**
+- **Layer 1 (User Story):** "So teams resolve issues 3x faster"
+- **Layer 2 (System Flow):** "So we find answers even with different wording"
+- **Layer 3 (Technical):** "So queries stay fast even with millions of tickets"
+
+### **5. Use Progressive Disclosure**
+Don't dump all 9 tables at once!
+- First: "We have 9 tables in 3 groups"
+- Then: Show the 3 groups
+- Finally: Drill into each group only if asked
+
+---
+
+## 📋 **Simple Talking Points by Audience**
+
+### **For Executives (2 minutes):**
+"When support asks a question, we find similar past solutions and show them procedures. If no procedure exists, AI generates one from patterns. This means faster resolution, consistent quality, and retained knowledge."
+
+### **For Product/Business (5 minutes):**
+"Three capabilities: Smart search finds similar tickets, knowledge base shows procedures, pattern recognition detects trends and auto-generates SOPs. Users get answers in seconds instead of hours."
+
+### **For Technical Teams (15 minutes):**
+"Nine tables in three groups: Search (tickets + SOPs with embeddings), Patterns (clustering + trending), Learning (search logs + audit trails). Key design: embeddings separate for performance - 10x faster metadata queries."
+
+### **For Developers (30 minutes):**
+"Here's the schema, here's why each decision was made, here's the implementation approach, here's what to watch out for."
+
+---
+
+## 🎯 **The Golden Rule:**
+
+**Lead with the flow, not the tables.**
+
+❌ Don't start with: "We have 9 tables..."
+✅ Start with: "User asks question → System finds answers → Here's how..."
+
+Then introduce tables as **enablers** of each step in the flow.
+=====================================================================================================
+
+
+Perfect! Here's a **formal schema specification** document ready for Information Architect review.
+
+---
+
+# **Schema Specification Document**
+## **Historic Ticket Search & Knowledge Management System**
+
+**Version:** 1.0  
+**Database:** PostgreSQL 14+  
+**Extensions Required:** `pgvector`
+
+---
+
+## **TABLE 1: `tickets`**
+
+### **Purpose:**
+Stores historical ticket metadata for semantic search and retrieval.
+
+### **Schema:**
+
+| Column Name | Data Type | Constraints | Description | Business Rules |
+|------------|-----------|-------------|-------------|----------------|
+| `ticket_id` | VARCHAR(64) | PRIMARY KEY, NOT NULL | Unique identifier for ticket | Globally unique across all source systems |
+| `external_id` | VARCHAR(100) | | Original ticket ID from source system | Example: "INC0012345", "JIRA-1234" |
+| `source_system` | VARCHAR(50) | NOT NULL | Source system name | Valid values: 'jira', 'servicenow', 'zendesk' |
+| `title` | VARCHAR(500) | | Brief ticket summary | User-facing display name |
+| `description` | TEXT | | Original ticket description | Full problem description from source |
+| `summary` | TEXT | | LLM-generated summary of ticket | This text is used to generate embedding vector |
+| `status` | VARCHAR(50) | NOT NULL | Current ticket status | Valid values: 'open', 'in_progress', 'resolved', 'closed' |
+| `priority` | VARCHAR(20) | | Ticket priority level | Valid values: 'p0', 'p1', 'p2', 'p3', 'p4', 'critical', 'high', 'medium', 'low' |
+| `severity` | VARCHAR(20) | | Impact severity | Valid values: 'critical', 'high', 'medium', 'low' |
+| `domain_name` | VARCHAR(50) | NOT NULL | Business domain/environment | Valid values: 'production', 'staging', 'development', domain-specific names |
+| `category` | VARCHAR(100) | | Primary classification | Examples: 'authentication', 'database', 'network', 'application' |
+| `tags` | TEXT[] | | Multi-valued descriptive labels | Array of lowercase tags for flexible categorization |
+| `created_date` | TIMESTAMPTZ | NOT NULL | Ticket creation timestamp | Stored in UTC, converted from source timezone |
+| `resolved_date` | TIMESTAMPTZ | | Ticket resolution timestamp | NULL if not yet resolved |
+| `updated_date` | TIMESTAMPTZ | | Last modification timestamp | Updated on any ticket change |
+| `assigned_group` | VARCHAR(100) | | Team/group assigned to ticket | Examples: 'Platform-Engineering', 'Database-Team' |
+| `assigned_user` | VARCHAR(100) | | Individual assigned to ticket | User identifier or email |
+| `resolution_summary` | TEXT | | Summary of how issue was resolved | Describes solution applied |
+| `tasks` | JSONB | | Structured task list | Array of task objects: [{"title": "...", "status": "...", "assigned_to": "..."}] |
+| `activities` | JSONB | | Activity/audit log | Array of activity objects: [{"timestamp": "...", "type": "...", "actor": "...", "details": "..."}] |
+| `resolution_time_hours` | INTEGER | | Time to resolution in hours | Calculated: resolved_date - created_date (in hours) |
+| `metadata` | JSONB | | Domain-specific flexible attributes | Key-value pairs for extensibility without schema changes |
+
+### **Indexes:**
+
+| Index Name | Type | Columns | Purpose |
+|-----------|------|---------|---------|
+| `idx_tickets_domain` | B-tree | (domain_name) | Filter tickets by domain |
+| `idx_tickets_category` | B-tree | (category) | Filter tickets by category |
+| `idx_tickets_status` | B-tree | (status) | Filter tickets by status |
+| `idx_tickets_created` | B-tree | (created_date) | Time-range queries |
+| `idx_tickets_resolved` | B-tree | (resolved_date) | Resolution time analysis |
+| `idx_tickets_source` | B-tree | (source_system, external_id) | Deduplication and source lookups |
+| `idx_tickets_tags` | GIN | (tags) | Tag-based filtering and searches |
+
+### **Constraints:**
+
+```sql
+-- Ensure valid status values
+CHECK (status IN ('open', 'in_progress', 'resolved', 'closed', 'pending', 'cancelled'))
+
+-- Ensure resolved_date is after created_date
+CHECK (resolved_date IS NULL OR resolved_date >= created_date)
+
+-- Ensure valid priority if specified
+CHECK (priority IS NULL OR priority IN ('p0', 'p1', 'p2', 'p3', 'p4', 'critical', 'high', 'medium', 'low'))
+```
+
+### **Notes:**
+- `tasks` and `activities` stored as JSONB for display purposes only; not indexed for individual querying
+- `summary` field is critical - this is the text that gets embedded for semantic search
+- `tags` use PostgreSQL native array type for efficient containment queries
+
+---
+
+## **TABLE 2: `ticket_embeddings`**
+
+### **Purpose:**
+Stores vector embeddings of ticket summaries for semantic similarity search. Separated from main ticket table for query performance optimization.
+
+### **Schema:**
+
+| Column Name | Data Type | Constraints | Description | Business Rules |
+|------------|-----------|-------------|-------------|----------------|
+| `ticket_id` | VARCHAR(64) | PRIMARY KEY, NOT NULL, FOREIGN KEY → tickets(ticket_id) ON DELETE CASCADE | Reference to parent ticket | 1:1 relationship with tickets |
+| `embedding` | VECTOR(3068) | NOT NULL | Vector representation of ticket | 3068-dimensional float array from embedding model |
+| `embedding_source` | TEXT | | Actual text that was embedded | Stores exact text used for reproducibility and debugging |
+| `embedding_model` | VARCHAR(50) | NOT NULL | Model used to generate embedding | Examples: 'text-embedding-3-large', 'text-embedding-ada-002' |
+| `embedding_generated_at` | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Timestamp of embedding generation | Tracks when embedding was created |
+
+### **Indexes:**
+
+| Index Name | Type | Columns | Purpose |
+|-----------|------|---------|---------|
+| `idx_ticket_embedding_vector` | IVFFlat | (embedding) vector_cosine_ops | Vector similarity search using cosine distance |
+
+### **Index Configuration:**
+```sql
+CREATE INDEX idx_ticket_embedding_vector ON ticket_embeddings 
+USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+
+-- Note: 'lists' parameter should be tuned based on dataset size:
+-- 10K-50K rows: lists = 50
+-- 50K-200K rows: lists = 100
+-- 200K-1M rows: lists = 500
+```
+
+### **Notes:**
+- Requires `pgvector` extension
+- Stored separately to prevent bloating main tickets table (embedding is ~12KB per row)
+- Use cosine distance for similarity: `ORDER BY embedding <-> query_embedding`
+- Always store `embedding_model` to track version for future re-embedding needs
+
+---
+
+## **TABLE 3: `standard_operating_procedures`**
+
+### **Purpose:**
+Stores standard operating procedures (SOPs) - both manually created and auto-generated from ticket patterns.
+
+### **Schema:**
+
+| Column Name | Data Type | Constraints | Description | Business Rules |
+|------------|-----------|-------------|-------------|----------------|
+| `sop_id` | BIGSERIAL | PRIMARY KEY | Auto-incrementing unique identifier | System-generated |
+| `sop_title` | VARCHAR(500) | NOT NULL | SOP title/name | User-facing display name |
+| `sop_description` | TEXT | | Brief description of SOP | Summary of what procedure covers |
+| `sop_content` | TEXT | NOT NULL | Full SOP procedure text | Complete step-by-step instructions |
+| `category` | VARCHAR(100) | | Primary classification | Should align with ticket categories |
+| `domain_name` | VARCHAR(50) | | Applicable domain/environment | Should align with ticket domains |
+| `tags` | TEXT[] | | Multi-valued descriptive labels | Examples: 'beginner-friendly', 'requires-approval', 'high-risk' |
+| `version` | VARCHAR(20) | NOT NULL, DEFAULT '1.0' | SOP version number | Semantic versioning: '1.0', '1.1', '2.0' |
+| `status` | VARCHAR(50) | NOT NULL, DEFAULT 'draft' | Workflow status | Valid values: 'draft', 'active', 'under_review', 'archived' |
+| `is_active` | BOOLEAN | DEFAULT TRUE | Display/search filter | TRUE = show in searches, FALSE = hidden but preserved |
+| `created_by` | VARCHAR(100) | | Author or generation source | Format: 'user:email@company.com' or 'auto-generated' |
+| `approved_by` | VARCHAR(100) | | Approver identifier | Required for status='active' in high-stakes scenarios |
+| `created_date` | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Creation timestamp | When SOP was first created |
+| `updated_date` | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Last modification timestamp | Updated on any content change |
+| `approved_date` | TIMESTAMPTZ | | Approval timestamp | When status moved to 'active' |
+| `file_path` | TEXT | | Storage path for generated document | Examples: 's3://bucket/sops/sop_123.pdf', '/shared/sops/sop_123.docx' |
+| `file_format` | VARCHAR(20) | | Document file format | Valid values: 'pdf', 'docx', 'markdown', 'html' |
+| `view_count` | INTEGER | DEFAULT 0 | Number of times SOP was viewed | Incremented on each view |
+| `last_accessed` | TIMESTAMPTZ | | Last time SOP was viewed | Updated on each access |
+| `source_cluster_id` | BIGINT | FOREIGN KEY → ticket_clusters(cluster_id) | Source cluster if auto-generated | NULL for manually created SOPs |
+
+### **Indexes:**
+
+| Index Name | Type | Columns | Purpose |
+|-----------|------|---------|---------|
+| `idx_sop_domain` | B-tree | (domain_name) | Filter SOPs by domain |
+| `idx_sop_category` | B-tree | (category) | Filter SOPs by category |
+| `idx_sop_status` | B-tree | (status) | Filter by workflow status |
+| `idx_sop_active` | B-tree | (is_active) | Quick filter for active SOPs |
+| `idx_sop_tags` | GIN | (tags) | Tag-based searches |
+| `idx_sop_source_cluster` | B-tree | (source_cluster_id) | Find SOPs generated from cluster |
+
+### **Constraints:**
+
+```sql
+-- Ensure valid status
+CHECK (status IN ('draft', 'active', 'under_review', 'archived'))
+
+-- Ensure valid file format if path provided
+CHECK (file_path IS NULL OR file_format IN ('pdf', 'docx', 'markdown', 'html', 'txt'))
+
+-- Ensure approved_date is after created_date
+CHECK (approved_date IS NULL OR approved_date >= created_date)
+```
+
+### **Notes:**
+- `sop_content` is the full text that gets embedded for semantic search
+- `status` manages workflow; `is_active` is simple display filter
+- `source_cluster_id` links back to pattern if auto-generated
+- `file_path` stores reference to formatted document (PDF/DOCX), not the content itself
+
+---
+
+## **TABLE 4: `sop_embeddings`**
+
+### **Purpose:**
+Stores vector embeddings of SOPs for semantic similarity search. Separated for performance optimization.
+
+### **Schema:**
+
+| Column Name | Data Type | Constraints | Description | Business Rules |
+|------------|-----------|-------------|-------------|----------------|
+| `sop_id` | BIGINT | PRIMARY KEY, FOREIGN KEY → standard_operating_procedures(sop_id) ON DELETE CASCADE | Reference to parent SOP | 1:1 relationship with SOPs |
+| `embedding` | VECTOR(3068) | NOT NULL | Vector representation of SOP | 3068-dimensional float array |
+| `embedding_model` | VARCHAR(50) | NOT NULL | Model used to generate embedding | Should match ticket embedding model |
+| `embedding_source` | TEXT | | What was embedded | Examples: 'title+description', 'full_content', 'title+description+content' |
+| `embedding_generated_at` | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Timestamp of embedding generation | Tracks when embedding was created |
+
+### **Indexes:**
+
+| Index Name | Type | Columns | Purpose |
+|-----------|------|---------|---------|
+| `idx_sop_embedding_vector` | IVFFlat | (embedding) vector_cosine_ops | Vector similarity search |
+
+### **Index Configuration:**
+```sql
+CREATE INDEX idx_sop_embedding_vector ON sop_embeddings 
+USING ivfflat (embedding vector_cosine_ops) WITH (lists = 50);
+
+-- Note: 'lists' can be smaller than ticket_embeddings since SOPs typically fewer in count
+```
+
+### **Notes:**
+- Same principles as `ticket_embeddings`
+- `embedding_source` documents which parts of SOP were embedded (critical for consistency)
+- Separate table prevents bloating main SOP table
+
+---
+
+## **TABLE 5: `ticket_clusters`**
+
+### **Purpose:**
+Stores results of machine learning clustering analysis - groups of similar tickets representing patterns or recurring issues.
+
+### **Schema:**
+
+| Column Name | Data Type | Constraints | Description | Business Rules |
+|------------|-----------|-------------|-------------|----------------|
+| `cluster_id` | BIGSERIAL | PRIMARY KEY | Auto-incrementing unique identifier | System-generated |
+| `cluster_name` | VARCHAR(200) | | Human-readable cluster name | Examples: 'Authentication Service Timeouts', 'Database Connection Pool Issues' |
+| `cluster_description` | TEXT | | Detailed description of pattern | Explains what tickets in this cluster have in common |
+| `clustering_algorithm` | VARCHAR(50) | NOT NULL | Algorithm used for clustering | Examples: 'kmeans', 'dbscan', 'hdbscan', 'agglomerative' |
+| `clustering_run_id` | VARCHAR(64) | NOT NULL | Identifier for clustering run | Format: 'algorithm_frequency_date' (e.g., 'kmeans_monthly_202411') |
+| `hyperparameters` | JSONB | | Algorithm configuration | Stores parameters like {n_clusters: 10, min_samples: 5, eps: 0.5} |
+| `centroid_embedding` | VECTOR(3068) | | Center point of cluster | Average of all ticket embeddings in cluster |
+| `domain_name` | VARCHAR(50) | | Primary domain of cluster | Most common domain among cluster tickets |
+| `category` | VARCHAR(100) | | Primary category of cluster | Most common category among cluster tickets |
+| `created_date` | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Cluster creation timestamp | When clustering was performed |
+| `ticket_count` | INTEGER | DEFAULT 0 | Total tickets in cluster | Count of all tickets assigned to this cluster |
+| `recent_ticket_count` | INTEGER | DEFAULT 0 | Recent tickets (last 7 days) | For trending analysis |
+| `trend_score` | FLOAT | | Trending indicator | Calculated as: recent_count / total_count (or velocity measure) |
+| `last_updated` | TIMESTAMPTZ | | Last time cluster stats updated | When counts/trend_score were recalculated |
+
+### **Indexes:**
+
+| Index Name | Type | Columns | Purpose |
+|-----------|------|---------|---------|
+| `idx_clusters_run` | B-tree | (clustering_run_id) | Group clusters by run |
+| `idx_clusters_domain` | B-tree | (domain_name) | Filter clusters by domain |
+| `idx_clusters_trend_score` | B-tree | (trend_score DESC) | Find trending clusters quickly |
+| `idx_clusters_created` | B-tree | (created_date) | Temporal queries |
+
+### **Constraints:**
+
+```sql
+-- Ensure valid algorithm
+CHECK (clustering_algorithm IN ('kmeans', 'dbscan', 'hdbscan', 'agglomerative', 'spectral'))
+
+-- Ensure non-negative counts
+CHECK (ticket_count >= 0 AND recent_ticket_count >= 0)
+
+-- Ensure trend_score is between 0 and 1 (if using ratio)
+CHECK (trend_score IS NULL OR (trend_score >= 0 AND trend_score <= 1))
+```
+
+### **Notes:**
+- `clustering_run_id` enables tracking multiple clustering approaches/runs
+- `hyperparameters` as JSONB allows storing different configs per algorithm
+- `centroid_embedding` enables finding "most representative ticket" in cluster
+- `trend_score` calculated periodically (e.g., daily job) for trending analysis
+
+---
+
+## **TABLE 6: `ticket_cluster_assignments`**
+
+### **Purpose:**
+Many-to-many relationship linking tickets to clusters. A ticket can belong to multiple clusters from different clustering runs.
+
+### **Schema:**
+
+| Column Name | Data Type | Constraints | Description | Business Rules |
+|------------|-----------|-------------|-------------|----------------|
+| `assignment_id` | BIGSERIAL | PRIMARY KEY | Auto-incrementing unique identifier | System-generated |
+| `ticket_id` | VARCHAR(64) | NOT NULL, FOREIGN KEY → tickets(ticket_id) ON DELETE CASCADE | Reference to ticket | Part of composite unique constraint |
+| `cluster_id` | BIGINT | NOT NULL, FOREIGN KEY → ticket_clusters(cluster_id) ON DELETE CASCADE | Reference to cluster | Part of composite unique constraint |
+| `distance_to_centroid` | FLOAT | | Distance from ticket to cluster center | Lower = stronger cluster membership |
+| `confidence_score` | FLOAT | | Membership confidence (0-1) | Higher = stronger assignment |
+| `is_outlier` | BOOLEAN | DEFAULT FALSE | Flags weak cluster assignments | TRUE if ticket doesn't fit well in any cluster |
+| `assigned_date` | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Assignment timestamp | When ticket was assigned to cluster |
+
+### **Indexes:**
+
+| Index Name | Type | Columns | Purpose |
+|-----------|------|---------|---------|
+| `idx_cluster_assign_ticket` | B-tree | (ticket_id) | Find all clusters for a ticket |
+| `idx_cluster_assign_cluster` | B-tree | (cluster_id) | Find all tickets in a cluster |
+| `idx_cluster_assign_confidence` | B-tree | (confidence_score DESC) | Filter by assignment strength |
+
+### **Constraints:**
+
+```sql
+-- Prevent duplicate assignments
+UNIQUE (ticket_id, cluster_id)
+
+-- Ensure confidence_score is between 0 and 1
+CHECK (confidence_score IS NULL OR (confidence_score >= 0 AND confidence_score <= 1))
+
+-- Ensure non-negative distance
+CHECK (distance_to_centroid IS NULL OR distance_to_centroid >= 0)
+```
+
+### **Notes:**
+- Many-to-many enables same ticket in multiple clustering runs
+- `confidence_score` useful for soft clustering algorithms
+- `is_outlier` helps identify tickets that don't fit patterns (potential new issue types)
+- Can have multiple assignments per ticket from different `clustering_run_id` values
+
+---
+
+## **TABLE 7: `search_queries`**
+
+### **Purpose:**
+Audit log of all user searches for analytics, gap identification, and quality monitoring.
+
+### **Schema:**
+
+| Column Name | Data Type | Constraints | Description | Business Rules |
+|------------|-----------|-------------|-------------|----------------|
+| `query_id` | BIGSERIAL | PRIMARY KEY | Auto-incrementing unique identifier | System-generated |
+| `user_query` | TEXT | NOT NULL | User's search question | Original text as entered by user |
+| `query_embedding` | VECTOR(3068) | | Embedded version of query | Used for finding similar past searches |
+| `user_id` | VARCHAR(100) | | User identifier | Email, username, or system ID |
+| `session_id` | VARCHAR(100) | | Session identifier | Tracks multi-query user sessions |
+| `query_timestamp` | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Search timestamp | When query was executed |
+| `top_ticket_id` | VARCHAR(64) | FOREIGN KEY → tickets(ticket_id) | Best matching ticket | NULL if no results |
+| `top_ticket_score` | FLOAT | | Similarity score of best ticket | Range 0-1, higher = better match |
+| `ticket_results_count` | INTEGER | | Number of ticket results returned | Count of tickets in result set |
+| `sop_found` | BOOLEAN | NOT NULL | Whether any SOP matched | TRUE if at least one SOP result |
+| `top_sop_id` | BIGINT | FOREIGN KEY → standard_operating_procedures(sop_id) | Best matching SOP | NULL if no SOP results |
+| `top_sop_score` | FLOAT | | Similarity score of best SOP | Range 0-1, higher = better match |
+| `sop_generated` | BOOLEAN | DEFAULT FALSE | Whether new SOP was generated | TRUE if auto-generation triggered |
+| `generated_sop_id` | BIGINT | FOREIGN KEY → standard_operating_procedures(sop_id) | ID of generated SOP | NULL if not generated |
+| `domain_name` | VARCHAR(50) | | Domain context of search | From user session or inferred |
+| `inferred_category` | VARCHAR(100) | | Auto-detected category | LLM or rule-based categorization of query |
+| `search_duration_ms` | INTEGER | | Search execution time | Milliseconds for performance monitoring |
+
+### **Indexes:**
+
+| Index Name | Type | Columns | Purpose |
+|-----------|------|---------|---------|
+| `idx_search_timestamp` | B-tree | (query_timestamp DESC) | Recent searches first |
+| `idx_search_user` | B-tree | (user_id) | Per-user search history |
+| `idx_search_sop_found` | B-tree | (sop_found) | Gap analysis (FALSE = no answer) |
+| `idx_search_domain` | B-tree | (domain_name) | Domain-specific analytics |
+| `idx_search_score` | B-tree | (top_ticket_score DESC) | Quality analysis |
+
+### **Constraints:**
+
+```sql
+-- Ensure scores are between 0 and 1
+CHECK (top_ticket_score IS NULL OR (top_ticket_score >= 0 AND top_ticket_score <= 1))
+CHECK (top_sop_score IS NULL OR (top_sop_score >= 0 AND top_sop_score <= 1))
+
+-- Ensure non-negative counts and duration
+CHECK (ticket_results_count IS NULL OR ticket_results_count >= 0)
+CHECK (search_duration_ms IS NULL OR search_duration_ms >= 0)
+
+-- If SOP generated, must have generated_sop_id
+CHECK (NOT sop_generated OR generated_sop_id IS NOT NULL)
+```
+
+### **Notes:**
+- Stores `query_embedding` to enable "find similar past searches"
+- Critical for identifying knowledge gaps (queries with low scores or no SOP)
+- `search_duration_ms` enables performance monitoring and optimization
+- `session_id` helps understand multi-query user journeys
+
+---
+
+## **TABLE 8: `sop_generation_history`**
+
+### **Purpose:**
+Audit trail for auto-generated SOPs - tracks exactly how each SOP was created for reproducibility and quality control.
+
+### **Schema:**
+
+| Column Name | Data Type | Constraints | Description | Business Rules |
+|------------|-----------|-------------|-------------|----------------|
+| `generation_id` | BIGSERIAL | PRIMARY KEY | Auto-incrementing unique identifier | System-generated |
+| `sop_id` | BIGINT | NOT NULL, FOREIGN KEY → standard_operating_procedures(sop_id) | Reference to generated SOP | Links to parent SOP |
+| `generated_from` | VARCHAR(50) | NOT NULL | Source type for generation | Valid values: 'cluster', 'single_ticket', 'multi_ticket', 'manual_template' |
+| `source_cluster_id` | BIGINT | FOREIGN KEY → ticket_clusters(cluster_id) | Source cluster if applicable | NULL if not cluster-based |
+| `source_ticket_ids` | TEXT[] | | Array of ticket IDs used | List of tickets that informed SOP generation |
+| `generation_prompt` | TEXT | | Full prompt sent to LLM | Exact text for reproducibility |
+| `llm_model` | VARCHAR(50) | NOT NULL | LLM model used | Examples: 'gpt-4', 'gpt-4-turbo', 'claude-3-opus', 'claude-3-sonnet' |
+| `llm_temperature` | FLOAT | | Temperature parameter | Typically 0.0-1.0 for generation |
+| `generated_by` | VARCHAR(100) | | User who triggered generation | Format: 'user:email' or 'system:auto' |
+| `generated_date` | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Generation timestamp | When SOP was created |
+| `manual_review_status` | VARCHAR(50) | | Review workflow status | Valid values: 'pending', 'approved', 'rejected', 'needs_revision' |
+| `reviewer_notes` | TEXT | | Notes from manual review | Feedback or approval comments |
+
+### **Indexes:**
+
+| Index Name | Type | Columns | Purpose |
+|-----------|------|---------|---------|
+| `idx_sop_gen_sop` | B-tree | (sop_id) | Find generation history for SOP |
+| `idx_sop_gen_cluster` | B-tree | (source_cluster_id) | Find SOPs generated from cluster |
+| `idx_sop_gen_date` | B-tree | (generated_date DESC) | Recent generations first |
+| `idx_sop_gen_review` | B-tree | (manual_review_status) | Filter by review status |
+
+### **Constraints:**
+
+```sql
+-- Ensure valid generation source
+CHECK (generated_from IN ('cluster', 'single_ticket', 'multi_ticket', 'manual_template', 'manual_creation'))
+
+-- If generated from cluster, must have cluster_id
+CHECK (generated_from != 'cluster' OR source_cluster_id IS NOT NULL)
+
+-- Ensure valid review status
+CHECK (manual_review_status IS NULL OR manual_review_status IN ('pending', 'approved', 'rejected', 'needs_revision'))
+
+-- Ensure temperature is valid if specified
+CHECK (llm_temperature IS NULL OR (llm_temperature >= 0 AND llm_temperature <= 2))
+```
+
+### **Notes:**
+- **Critical for reproducibility** - stores exact prompt and parameters
+- `source_ticket_ids` as array enables tracking all contributing tickets
+- `manual_review_status` supports approval workflows before activation
+- Retained even if SOP is deleted (historical record)
+
+---
+
+## **TABLE 9: `trending_issues` (Materialized View)**
+
+### **Purpose:**
+Pre-computed view of trending clusters for fast on-demand queries and alerting. Identifies which issue patterns are spiking.
+
+### **Schema:**
+
+| Column Name | Data Type | Source | Description | Business Rules |
+|------------|-----------|--------|-------------|----------------|
+| `cluster_id` | BIGINT | ticket_clusters | Reference to cluster | Primary grouping key |
+| `cluster_name` | VARCHAR(200) | ticket_clusters | Cluster display name | |
+| `cluster_description` | TEXT | ticket_clusters | Pattern description | |
+| `category` | VARCHAR(100) | ticket_clusters | Primary category | |
+| `domain_name` | VARCHAR(50) | ticket_clusters | Primary domain | |
+| `total_tickets` | INTEGER | Computed | All-time tickets in cluster | COUNT(DISTINCT ticket_id) |
+| `tickets_last_7d` | INTEGER | Computed | Tickets in last 7 days | Filtered by created_date |
+| `tickets_last_30d` | INTEGER | Computed | Tickets in last 30 days | Filtered by created_date |
+| `tickets_previous_7d` | INTEGER | Computed | Tickets in prior 7-day period | For week-over-week comparison |
+| `trend_percentage` | FLOAT | Computed | Percentage change in activity | (last_7d - previous_7d) / previous_7d |
+| `last_ticket_date` | TIMESTAMPTZ | Computed | Most recent ticket in cluster | MAX(created_date) |
+| `available_sops` | INTEGER | Computed | Number of SOPs for cluster | COUNT(DISTINCT sop_id where source_cluster_id = cluster_id) |
+| `has_sop` | BOOLEAN | Computed | Whether any SOP exists | TRUE if available_sops > 0 |
+
+### **Refresh Strategy:**
+```sql
+-- Manual refresh (on-demand or scheduled)
+REFRESH MATERIALIZED VIEW CONCURRENTLY trending_issues;
+
+-- Recommended schedule: Daily at 2 AM
+```
+
+### **Base Query:**
+```sql
+CREATE MATERIALIZED VIEW trending_issues AS
+SELECT 
+    tc.cluster_id,
+    tc.cluster_name,
+    tc.cluster_description,
+    tc.category,
+    tc.domain_name,
+    COUNT(DISTINCT tca.ticket_id) as total_tickets,
+    COUNT(DISTINCT CASE WHEN t.created_date > NOW() - INTERVAL '7 days' THEN tca.ticket_id END) as tickets_last_7d,
+    COUNT(DISTINCT CASE WHEN t.created_date > NOW() - INTERVAL '30 days' THEN tca.ticket_id END) as tickets_last_30d,
+    COUNT(DISTINCT CASE WHEN t.created_date BETWEEN NOW() - INTERVAL '14 days' AND NOW() - INTERVAL '7 days' THEN tca.ticket_id END) as tickets_previous_7d,
+    -- Trend calculation
+    CASE 
+        WHEN COUNT(DISTINCT CASE WHEN t.created_date BETWEEN NOW() - INTERVAL '14 days' AND NOW() - INTERVAL '7 days' THEN tca.ticket_id END) > 0
+        THEN (COUNT(DISTINCT CASE WHEN t.created_date > NOW() - INTERVAL '7 days' THEN tca.ticket_id END)::FLOAT /
+              COUNT(DISTINCT CASE WHEN t.created_date BETWEEN NOW() - INTERVAL '14 days' AND NOW() - INTERVAL '7 days' THEN tca.ticket_id END)) - 1.0
+        ELSE 0 
+    END as trend_percentage,
+    MAX(t.created_date) as last_ticket_date,
+    COUNT(DISTINCT s.sop_id) as available_sops,
+    (COUNT(DISTINCT s.sop_id) > 0) as has_sop
+FROM ticket_clusters tc
+JOIN ticket_cluster_assignments tca ON tc.cluster_id = tca.cluster_id
+JOIN tickets t ON tca.ticket_id = t.ticket_id
+LEFT JOIN standard_operating_procedures s ON tc.cluster_id = s.source_cluster_id AND s.is_active = TRUE
+GROUP BY tc.cluster_id, tc.cluster_name, tc.cluster_description, tc.category, tc.domain_name
+HAVING COUNT(DISTINCT tca.ticket_id) >= 5  -- Minimum cluster size
+ORDER BY trend_percentage DESC;
+```
+
+### **Indexes:**
+
+| Index Name | Type | Columns | Purpose |
+|-----------|------|---------|---------|
+| `idx_trending_percentage` | B-tree | (trend_percentage DESC) | Find highest trending clusters |
+| `idx_trending_last_7d` | B-tree | (tickets_last_7d DESC) | Most active clusters |
+| `idx_trending_category` | B-tree | (category) | Category-based filtering |
+
+### **Notes:**
+- Materialized view for performance (pre-computed aggregations)
+- Requires `REFRESH MATERIALIZED VIEW` to update data
+- Use `CONCURRENTLY` option to allow queries during refresh
+- Consider partitioning source tables if data volume exceeds 10M tickets
+- Trending calculation can be customized (velocity, acceleration, etc.)
+
+---
+
+## **Database Constraints & Relationships**
+
+### **Foreign Key Relationships:**
+
+```
+tickets (1) ←→ (1) ticket_embeddings
+tickets (1) ←→ (N) ticket_cluster_assignments
+tickets (1) ←→ (N) search_queries (top_ticket_id)
+
+ticket_clusters (1) ←→ (N) ticket_cluster_assignments
+ticket_clusters (1) ←→ (N) standard_operating_procedures (source_cluster_id)
+
+standard_operating_procedures (1) ←→ (1) sop_embeddings
+standard_operating_procedures (1) ←→ (N) search_queries (top_sop_id, generated_sop_id)
+standard_operating_procedures (1) ←→ (N) sop_generation_history
+```
+
+### **Cascade Rules:**
+- `ticket_embeddings`: CASCADE on ticket deletion (embedding meaningless without ticket)
+- `ticket_cluster_assignments`: CASCADE on ticket/cluster deletion (assignment meaningless without parent)
+- `sop_embeddings`: CASCADE on SOP deletion (embedding meaningless without SOP)
+- `search_queries`: SET NULL on ticket/SOP deletion (preserve search log)
+- `sop_generation_history`: NO ACTION on SOP deletion (preserve audit trail even if SOP deleted)
+
+---
+
+## **PostgreSQL Extensions Required**
+
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;  -- pgvector for vector similarity search
+```
+
+---
+
+## **Estimated Storage Requirements**
+
+Based on 1 million tickets and 1,000 SOPs:
+
+| Table | Row Size (avg) | 1M Tickets | Notes |
+|-------|----------------|------------|-------|
+| `tickets` | ~2 KB | 2 GB | Metadata only |
+| `ticket_embeddings` | ~12 KB | 12 GB | Vector data dominates |
+| `ticket_clusters` | ~1 KB | <1 MB | Small table (hundreds of clusters) |
+| `ticket_cluster_assignments` | ~50 bytes | 50 MB | Linking table |
+| `standard_operating_procedures` | ~5 KB | 5 MB | 1K SOPs estimate |
+| `sop_embeddings` | ~12 KB | 12 MB | 1K SOPs estimate |
+| `search_queries` | ~500 bytes | Varies | Grows continuously, archive old data |
+| `sop_generation_history` | ~2 KB | 2 MB | 1K SOPs estimate |
+
+**Total estimated storage: ~15 GB for 1M tickets + 1K SOPs**
+
+---
+
+## **Data Retention & Archival Strategy**
+
+### **search_queries:**
+- **Active retention:** 90 days
+- **Archive strategy:** Move to cold storage after 90 days
+- **Reasoning:** Analytics focus on recent patterns
+
+### **All other tables:**
+- **Indefinite retention** - historic data is core business value
+- **Partition strategy:** Consider partitioning `tickets` by created_date (yearly partitions) if exceeding 10M rows
+
+---
+
+## **Performance Considerations**
+
+1. **Vector indexes** (IVFFlat) require periodic `REINDEX` as data grows
+2. **Materialized view** `trending_issues` needs scheduled refresh
+3. **VACUUM** operations critical for JSONB columns
+4. **Connection pooling** recommended (pgBouncer or equivalent)
+5. **Read replicas** for reporting/analytics queries
+
+---
+
+## **Security & Compliance**
+
+### **Sensitive Data Fields:**
+- `user_id` in search_queries (PII)
+- `assigned_user` in tickets (PII)
+- Consider encryption at rest for production deployment
+
+### **Access Control:**
+Implement row-level security (RLS) if multiple tenants/domains require data isolation.
+
+---
+
+## **Version History**
+
+| Version | Date | Changes | Author |
+|---------|------|---------|--------|
+| 1.0 | 2024-11-06 | Initial schema specification | [Your Name] |
+
+---
+
+**Approval Sign-off:**
+
+| Role | Name | Signature | Date |
+|------|------|-----------|------|
+| Information Architect | | | |
+| Database Administrator | | | |
+| Security Lead | | | |
+| Development Lead | | | |
+
+---
+
+This document provides complete schema specifications ready for Information Architect review and approval. All field descriptions, constraints, relationships, and design rationale are documented for technical review.
+
+
+
+
+
+
+Does this framework help you organize your thoughts? Which layer do you want to focus on first for your specific audience?
