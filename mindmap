@@ -1,0 +1,445 @@
+import streamlit as st
+import pandas as pd
+import json
+import plotly.graph_objects as go
+import networkx as nx
+import os
+from dotenv import load_dotenv
+import requests
+
+# Load environment variables
+load_dotenv()
+
+# Authentication
+ADMIN_USER = os.getenv('ADMIN_USERNAME', 'admin')
+ADMIN_PASS = os.getenv('ADMIN_PASSWORD', 'admin123')
+
+# LLM API Key
+GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
+
+def login():
+    """Simple login"""
+    if 'logged_in' not in st.session_state:
+        st.session_state.logged_in = False
+    
+    if not st.session_state.logged_in:
+        st.title("🔐 Login")
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        
+        if st.button("Login"):
+            if username == ADMIN_USER and password == ADMIN_PASS:
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error("Invalid credentials")
+        st.stop()
+
+def analyze_excel(file):
+    """Analyze Excel and create detailed mind map with data"""
+    excel_file = pd.ExcelFile(file)
+    nodes = [{
+        "id": "0", 
+        "label": file.name, 
+        "level": 0,
+        "type": "root",
+        "details": f"Excel file with {len(excel_file.sheet_names)} sheets",
+        "data": {}
+    }]
+    edges = []
+    node_id = 1
+    
+    all_data = {}  # Store all Excel data for context
+    
+    for sheet_name in excel_file.sheet_names[:10]:
+        df = excel_file.parse(sheet_name)
+        
+        # Store sheet data
+        sheet_data = {
+            "rows": len(df),
+            "columns": list(df.columns),
+            "preview": df.head(5).to_dict('records')
+        }
+        all_data[sheet_name] = sheet_data
+        
+        # Add sheet node
+        sheet_id = str(node_id)
+        nodes.append({
+            "id": sheet_id,
+            "label": sheet_name,
+            "level": 1,
+            "type": "sheet",
+            "details": f"Sheet with {len(df)} rows and {len(df.columns)} columns",
+            "data": sheet_data
+        })
+        edges.append({"source": "0", "target": sheet_id})
+        node_id += 1
+        
+        # Add column nodes
+        for col in df.columns[:5]:
+            col_id = str(node_id)
+            col_info = {
+                "type": str(df[col].dtype),
+                "non_null": int(df[col].count()),
+                "unique": int(df[col].nunique()),
+                "sample": df[col].dropna().head(3).tolist() if len(df[col].dropna()) > 0 else []
+            }
+            
+            nodes.append({
+                "id": col_id,
+                "label": col,
+                "level": 2,
+                "type": "column",
+                "details": f"Type: {col_info['type']}, Non-null: {col_info['non_null']}, Unique: {col_info['unique']}",
+                "data": col_info
+            })
+            edges.append({"source": sheet_id, "target": col_id})
+            node_id += 1
+    
+    return {
+        "nodes": nodes, 
+        "edges": edges,
+        "full_data": all_data,
+        "filename": file.name
+    }
+
+def chat_with_llm(question, context, conversation_history):
+    """Chat with Llama about the mind map"""
+    if not GROQ_API_KEY:
+        return "⚠️ No GROQ_API_KEY found in .env file. Please add it to enable conversation."
+    
+    try:
+        # Build conversation with context
+        messages = [
+            {
+                "role": "system",
+                "content": f"""You are a helpful assistant analyzing an Excel file mind map. 
+
+Current context:
+{json.dumps(context, indent=2)}
+
+Answer questions about this data clearly and concisely. If asked about specific data, reference the actual values."""
+            }
+        ]
+        
+        # Add conversation history
+        for msg in conversation_history[-6:]:  # Last 3 exchanges
+            messages.append(msg)
+        
+        # Add current question
+        messages.append({"role": "user", "content": question})
+        
+        headers = {
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "model": "llama-3.2-90b-vision-preview",
+            "messages": messages,
+            "max_tokens": 1000,
+            "temperature": 0.7
+        }
+        
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers=headers,
+            json=data,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            return response.json()["choices"][0]["message"]["content"]
+        else:
+            return f"Error: {response.status_code} - {response.text[:200]}"
+    
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+def visualize(mindmap_data):
+    """Create interactive visualization with clickable nodes"""
+    G = nx.Graph()
+    
+    # Add nodes and edges
+    node_info = {}
+    for node in mindmap_data['nodes']:
+        G.add_node(node['id'], **node)
+        node_info[node['id']] = node
+    
+    for edge in mindmap_data['edges']:
+        G.add_edge(edge['source'], edge['target'])
+    
+    # Layout
+    pos = nx.spring_layout(G, k=2, iterations=50)
+    
+    # Create edges
+    edge_x, edge_y = [], []
+    for edge in G.edges():
+        x0, y0 = pos[edge[0]]
+        x1, y1 = pos[edge[1]]
+        edge_x.extend([x0, x1, None])
+        edge_y.extend([y0, y1, None])
+    
+    edge_trace = go.Scatter(
+        x=edge_x, y=edge_y,
+        line=dict(width=2, color='#888'),
+        mode='lines',
+        hoverinfo='none'
+    )
+    
+    # Create nodes with click events
+    node_x, node_y, node_text, node_color, node_ids = [], [], [], [], []
+    for node_id in G.nodes():
+        x, y = pos[node_id]
+        node = G.nodes[node_id]
+        node_x.append(x)
+        node_y.append(y)
+        node_text.append(node['label'])
+        node_ids.append(node_id)
+        
+        level = node['level']
+        colors = ['#FF6B6B', '#4ECDC4', '#95E1D3']
+        node_color.append(colors[level] if level < len(colors) else '#95E1D3')
+    
+    node_trace = go.Scatter(
+        x=node_x, y=node_y,
+        mode='markers+text',
+        text=node_text,
+        textposition="top center",
+        marker=dict(
+            color=node_color, 
+            size=35,
+            line=dict(width=2, color='white')
+        ),
+        customdata=node_ids,
+        hovertemplate='<b>%{text}</b><br>Click to view details<extra></extra>'
+    )
+    
+    # Create figure
+    fig = go.Figure(
+        data=[edge_trace, node_trace],
+        layout=go.Layout(
+            title='Interactive Mind Map (Click nodes to view details)',
+            showlegend=False,
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            height=700,
+            clickmode='event+select'
+        )
+    )
+    
+    return fig, node_info
+
+def main():
+    st.set_page_config(
+        page_title="Mind Map with Chat",
+        page_icon="🧠",
+        layout="wide"
+    )
+    
+    # Check login
+    login()
+    
+    # Initialize session state
+    if 'chat_history' not in st.session_state:
+        st.session_state.chat_history = []
+    if 'selected_node' not in st.session_state:
+        st.session_state.selected_node = None
+    
+    # Header
+    st.title("🧠 Interactive Mind Map with Conversation")
+    
+    col_logout, col_status = st.columns([6, 1])
+    with col_logout:
+        st.markdown(f"**Logged in as:** {ADMIN_USER}")
+    with col_status:
+        if st.button("Logout"):
+            st.session_state.logged_in = False
+            st.rerun()
+    
+    st.markdown("---")
+    
+    # Upload section
+    uploaded_file = st.file_uploader("📁 Upload Excel File", type=['xlsx', 'xls'])
+    
+    if uploaded_file:
+        if 'mindmap' not in st.session_state or st.session_state.get('last_file') != uploaded_file.name:
+            with st.spinner("Analyzing Excel file..."):
+                mindmap_data = analyze_excel(uploaded_file)
+                st.session_state['mindmap'] = mindmap_data
+                st.session_state['last_file'] = uploaded_file.name
+                st.session_state.chat_history = []
+            st.success(f"✅ Loaded: {uploaded_file.name}")
+    
+    # Main content - 3 column layout like NotebookLM
+    if 'mindmap' in st.session_state:
+        mindmap_data = st.session_state['mindmap']
+        
+        # Create layout: Left panel (details + chat) | Right panel (mind map)
+        left_col, right_col = st.columns([1, 2])
+        
+        with right_col:
+            st.subheader("🗺️ Mind Map Visualization")
+            fig, node_info = visualize(mindmap_data)
+            
+            # Display the plot
+            selected_points = st.plotly_chart(
+                fig, 
+                use_container_width=True,
+                on_select="rerun",
+                key="mindmap_plot"
+            )
+            
+            # Handle node selection (Streamlit's plotly click handling)
+            st.info("💡 Click on any node to view details and start conversation")
+            
+            # Manual node selector as fallback
+            with st.expander("Or select node manually"):
+                node_names = {node['id']: node['label'] for node in mindmap_data['nodes']}
+                selected_id = st.selectbox(
+                    "Choose a node",
+                    options=list(node_names.keys()),
+                    format_func=lambda x: node_names[x]
+                )
+                if st.button("Load Node"):
+                    st.session_state.selected_node = selected_id
+                    st.rerun()
+        
+        with left_col:
+            st.subheader("📋 Node Details & Chat")
+            
+            # Show selected node details
+            if st.session_state.selected_node:
+                node = next((n for n in mindmap_data['nodes'] if n['id'] == st.session_state.selected_node), None)
+                
+                if node:
+                    st.markdown(f"### {node['label']}")
+                    st.markdown(f"**Type:** {node['type'].title()}")
+                    st.markdown(f"**Details:** {node['details']}")
+                    
+                    # Show data if available
+                    if node.get('data'):
+                        with st.expander("View Raw Data"):
+                            st.json(node['data'])
+                    
+                    st.markdown("---")
+                    
+                    # Chat interface
+                    st.markdown("### 💬 Ask Questions")
+                    
+                    # Display chat history for this context
+                    chat_container = st.container(height=300)
+                    with chat_container:
+                        for msg in st.session_state.chat_history:
+                            if msg['role'] == 'user':
+                                st.markdown(f"**You:** {msg['content']}")
+                            else:
+                                st.markdown(f"**AI:** {msg['content']}")
+                    
+                    # Chat input
+                    question = st.text_input(
+                        "Ask about this node or the data",
+                        placeholder=f"e.g., What does {node['label']} contain?",
+                        key="chat_input"
+                    )
+                    
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        if st.button("Send", type="primary", use_container_width=True):
+                            if question:
+                                # Prepare context
+                                context = {
+                                    "selected_node": node,
+                                    "filename": mindmap_data['filename'],
+                                    "full_data": mindmap_data.get('full_data', {})
+                                }
+                                
+                                # Get response
+                                with st.spinner("Thinking..."):
+                                    response = chat_with_llm(
+                                        question, 
+                                        context, 
+                                        st.session_state.chat_history
+                                    )
+                                
+                                # Update history
+                                st.session_state.chat_history.append({
+                                    "role": "user",
+                                    "content": question
+                                })
+                                st.session_state.chat_history.append({
+                                    "role": "assistant",
+                                    "content": response
+                                })
+                                
+                                st.rerun()
+                    
+                    with col2:
+                        if st.button("Clear Chat", use_container_width=True):
+                            st.session_state.chat_history = []
+                            st.rerun()
+                    
+                    # Quick questions
+                    st.markdown("##### Quick Questions:")
+                    quick_questions = [
+                        f"What is {node['label']}?",
+                        f"Tell me more about {node['label']}",
+                        "Summarize this data",
+                        "What insights can you find?"
+                    ]
+                    
+                    for q in quick_questions:
+                        if st.button(q, key=f"quick_{q}", use_container_width=True):
+                            context = {
+                                "selected_node": node,
+                                "filename": mindmap_data['filename'],
+                                "full_data": mindmap_data.get('full_data', {})
+                            }
+                            
+                            with st.spinner("Thinking..."):
+                                response = chat_with_llm(q, context, st.session_state.chat_history)
+                            
+                            st.session_state.chat_history.append({"role": "user", "content": q})
+                            st.session_state.chat_history.append({"role": "assistant", "content": response})
+                            st.rerun()
+            
+            else:
+                st.info("👆 Click on a node in the mind map to view details and start chatting")
+                
+                # Show file overview
+                st.markdown("### 📊 File Overview")
+                st.markdown(f"**Filename:** {mindmap_data['filename']}")
+                st.markdown(f"**Total Nodes:** {len(mindmap_data['nodes'])}")
+                st.markdown(f"**Sheets:** {len([n for n in mindmap_data['nodes'] if n['type'] == 'sheet'])}")
+        
+        # Export section
+        st.markdown("---")
+        col1, col2 = st.columns(2)
+        with col1:
+            json_str = json.dumps(mindmap_data, indent=2)
+            st.download_button(
+                "📥 Download Mind Map JSON",
+                json_str,
+                f"{mindmap_data['filename']}_mindmap.json",
+                "application/json"
+            )
+        
+        with col2:
+            if st.session_state.chat_history:
+                chat_export = "\n\n".join([
+                    f"{'You' if msg['role'] == 'user' else 'AI'}: {msg['content']}"
+                    for msg in st.session_state.chat_history
+                ])
+                st.download_button(
+                    "📥 Download Chat History",
+                    chat_export,
+                    "chat_history.txt",
+                    "text/plain"
+                )
+
+if __name__ == "__main__":
+    main()
+
+
+
+    
