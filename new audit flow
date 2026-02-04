@@ -1,0 +1,1170 @@
+# Event-Driven Audit Framework
+## Final Executive Presentation (Design & Concept)
+
+---
+
+## **Slide 1: The Business Problem We're Solving**
+
+### **Three Critical Pain Points Today**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                  │
+│  PROBLEM 1: "WHERE'S MY GROUP?"                                 │
+│  ────────────────────────────────────────────────────────────   │
+│  Business stakeholder asks → No one knows                       │
+│  • Takes 2-3 days to manually trace across 5 systems           │
+│  • 50+ inquiries per week = 100 hours wasted                   │
+│  • Member complaints escalate while we investigate              │
+│                                                                  │
+│  ──────────────────────────────────────────────────────────────│
+│                                                                  │
+│  PROBLEM 2: MIGRATION RISK                                      │
+│  ────────────────────────────────────────────────────────────   │
+│  Moving 50,000+ historic groups to new systems                  │
+│  • No way to validate success in real-time                     │
+│  • Discover issues weeks later                                 │
+│  • 12 weeks manual reconciliation = project delays             │
+│  • Business uncertainty kills transformation momentum           │
+│                                                                  │
+│  ──────────────────────────────────────────────────────────────│
+│                                                                  │
+│  PROBLEM 3: EXCEPTION CHAOS                                     │
+│  ────────────────────────────────────────────────────────────   │
+│  Errors buried in system logs                                   │
+│  • Wrong teams get tickets (5-day ping-pong)                   │
+│  • No context = hours wasted investigating                     │
+│  • Same issue happens repeatedly, no learning                  │
+│  • $500K/year in operational waste                             │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Business Impact:**
+- 💰 **Cost:** 100+ hours/week of manual investigation
+- 😞 **Member Experience:** Delayed coverage, billing errors
+- ⚠️ **Risk:** Cannot certify migration success
+- 📋 **Compliance:** No audit trail for regulatory questions
+
+---
+
+## **Slide 2: The Vision - Digital Nervous System**
+
+### **Like a Fitbit for Our Business Operations**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                  │
+│              FROM: Flying Blind                                 │
+│              TO: Real-Time Intelligence                         │
+│                                                                  │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │                                                           │  │
+│  │  Just like a Fitbit continuously monitors your health:   │  │
+│  │                                                           │  │
+│  │  ✓ Tracks every heartbeat (every transaction)            │  │
+│  │  ✓ Alerts when something is wrong (exceptions)           │  │
+│  │  ✓ Shows historical trends (time travel)                 │  │
+│  │  ✓ Predicts problems before they happen (AI)             │  │
+│  │                                                           │  │
+│  │  Our framework does the same for enrollment workflows    │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  CORE CAPABILITIES:                                             │
+│                                                                  │
+│  🔍 INSTANT VISIBILITY                                          │
+│     "Where is Group ABC123?" → Answer in 2 seconds             │
+│                                                                  │
+│  🧠 INTELLIGENT TRIAGE                                          │
+│     Technical errors → Plain English + Auto-routed to right team│
+│                                                                  │
+│  🎯 MIGRATION COMMAND CENTER                                    │
+│     Track 50K groups loading in real-time with 90% auto-fix    │
+│                                                                  │
+│  🕐 COMPLETE AUDIT TRAIL                                        │
+│     "Show me exactly what happened March 15th" → Full timeline  │
+│                                                                  │
+│  🤖 SELF-HEALING (Future)                                       │
+│     60% of exceptions auto-resolve without human intervention   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## **Slide 3: Use Cases - Who Benefits and How**
+
+### **Use Case 1: New Business (Daily Operations)**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  SCENARIO: Sales rep sells new group with 200 members           │
+│                                                                  │
+│  TODAY:                                                         │
+│  • Sales: "Did my group get set up?"                           │
+│  • Operations: "Let me check 5 systems... I'll call you back" │
+│  • 2 days later: "There's an issue, not sure where"           │
+│                                                                  │
+│  TOMORROW WITH FRAMEWORK:                                       │
+│  • Sales: "What's the status of Group ABC123?"                 │
+│  • Dashboard shows instantly:                                   │
+│                                                                  │
+│    Group ABC123                                                 │
+│    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 80% Complete       │
+│                                                                  │
+│    ✓ SellPoint      → Complete (Feb 1)                         │
+│    ✓ EnrollPoint    → Complete (Feb 2)                         │
+│    ⚠️ ORMB          → 5 Members Failed (Feb 3)                 │
+│       Issue: Missing date of birth for child dependents        │
+│       Assigned To: Enrollment Team                             │
+│       ETA: 2 hours                                              │
+│    ⏳ EB Compute    → Pending                                   │
+│    ⏳ SIP           → Pending                                   │
+│                                                                  │
+│  VALUE DELIVERED:                                               │
+│  ✓ Instant visibility (no more "let me check")                │
+│  ✓ Proactive issue resolution (caught before member impact)    │
+│  ✓ 90% reduction in "where's my group?" calls                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### **Use Case 2: Migration (Historic Data Load)**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  SCENARIO: Loading 50,000 groups from legacy to new systems     │
+│                                                                  │
+│  TODAY:                                                         │
+│  • Friday night: Load data → Hope for the best 🤞              │
+│  • Monday morning: "Did it work?"                              │
+│  • Weeks 2-12: Manual reconciliation (find mismatches)         │
+│  • Month 3: Finally certify migration success                  │
+│                                                                  │
+│  TOMORROW WITH FRAMEWORK:                                       │
+│  • Friday 6 PM: Migration starts                               │
+│  • Saturday 10 AM: Real-time dashboard shows:                  │
+│                                                                  │
+│    ┌────────────────────────────────────────────────────────┐  │
+│    │ MIGRATION WAVE 1: 10,000 Groups                        │  │
+│    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 92%         │  │
+│    │                                                         │  │
+│    │ ✅ Loaded: 9,200 groups (92%)                          │  │
+│    │ ⚡ Auto-Fixed: 650 groups (6.5%)                       │  │
+│    │    • 400: Termed members filtered                      │  │
+│    │    • 150: Plan codes mapped                            │  │
+│    │    • 100: Date formats corrected                       │  │
+│    │                                                         │  │
+│    │ 🔍 Needs Review: 150 groups (1.5%)                     │  │
+│    │    • 80: Missing dependent data → Tier 2               │  │
+│    │    • 50: Employer link broken → Data team              │  │
+│    │    • 20: Data corruption → Escalated                   │  │
+│    │                                                         │  │
+│    │ Predicted Completion: Sunday 6 PM                      │  │
+│    └────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  • Monday 9 AM: Executive report ready                         │
+│    "Migration 98.5% successful, 150 items in review queue"     │
+│                                                                  │
+│  VALUE DELIVERED:                                               │
+│  ✓ Real-time validation (not weeks later)                     │
+│  ✓ 90% auto-reconciliation (not manual)                       │
+│  ✓ 2-week certification (not 12 weeks)                        │
+│  ✓ Executive confidence on Day 1                               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### **Use Case 3: Exception Management (Ongoing Operations)**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  SCENARIO: Member enrollment fails with cryptic database error   │
+│                                                                  │
+│  TODAY:                                                         │
+│  • Hour 0: Error appears in system log                         │
+│  • Hour 2: Operator notices (if lucky)                         │
+│  • Hour 4: Operator emails 3 teams: "Whose problem is this?"  │
+│  • Day 2: Correct team responds                                │
+│  • Day 3: Team investigates root cause                         │
+│  • Day 5: Issue finally resolved                               │
+│                                                                  │
+│  Total Resolution Time: 5+ days                                 │
+│                                                                  │
+│  TOMORROW WITH FRAMEWORK:                                       │
+│  • Second 0: Error occurs                                      │
+│  • Second 5: AI analyzes and classifies                        │
+│  • Second 10: Ticket auto-created with context:               │
+│                                                                  │
+│    ┌────────────────────────────────────────────────────────┐  │
+│    │ 🚨 Exception: Group ABC123                             │  │
+│    │                                                         │  │
+│    │ Plain English Summary:                                 │  │
+│    │ "5 child members cannot be enrolled because their     │  │
+│    │  date of birth is missing. This typically happens     │  │
+│    │  when the sales system doesn't capture DOB for        │  │
+│    │  dependents under age 2."                              │  │
+│    │                                                         │  │
+│    │ Business Impact:                                       │  │
+│    │ "These children won't get ID cards until resolved.    │  │
+│    │  Employer will notice incomplete enrollment."         │  │
+│    │                                                         │  │
+│    │ Recommended Action:                                    │  │
+│    │ "Contact sales rep John Doe (jdoe@company.com) to     │  │
+│    │  obtain missing birth dates. Update in EnrollPoint.   │  │
+│    │  Typical resolution time: 2-4 hours."                 │  │
+│    │                                                         │  │
+│    │ Assigned To: Enrollment Team (auto-routed)            │  │
+│    │ Priority: P2                                           │  │
+│    │ Created: 10 seconds ago                                │  │
+│    └────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  • Second 15: Slack alert sent to team + sales rep             │
+│  • Hour 2: Issue resolved                                      │
+│                                                                  │
+│  Total Resolution Time: 2 hours                                 │
+│                                                                  │
+│  VALUE DELIVERED:                                               │
+│  ✓ 96% faster resolution (5 days → 2 hours)                   │
+│  ✓ No more "whose problem is this?" ping-pong                 │
+│  ✓ Context provided automatically                              │
+│  ✓ Right team gets it first time                               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## **Slide 4: How It Works - Three Pillars of Design**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   THE THREE PILLARS                              │
+│                                                                  │
+│   PILLAR 1              PILLAR 2              PILLAR 3          │
+│   ──────────            ──────────            ──────────         │
+│                                                                  │
+│   🔗 DIGITAL             🧠 INTELLIGENT        🕐 TIME           │
+│   FINGERPRINT           PROCESSING            TRAVEL            │
+│                                                                  │
+│   Common thread         AI-powered            Complete audit    │
+│   across all systems    understanding         trail + replay    │
+│                                                                  │
+│   "Tracking number      "Smart medical        "DVR for your     │
+│    for transactions"     assistant"            business"         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### **PILLAR 1: Digital Fingerprint**
+
+**Concept:** Every transaction gets a unique ID that follows it through all systems
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  HOW IT WORKS:                                                   │
+│                                                                  │
+│  Like FedEx tracking a package through distribution centers:    │
+│                                                                  │
+│  Transaction ID: txn_550e8400...                                │
+│  Group: ABC123                                                   │
+│  Effective Date: 2026-03-01                                     │
+│  Type: New Enrollment                                           │
+│                                                                  │
+│  Journey:                                                       │
+│  ┌──────────┐      ┌────────────┐      ┌──────┐      ┌────┐   │
+│  │SellPoint │  →   │EnrollPoint │  →   │ ORMB │  →   │EB  │   │
+│  │          │      │            │      │      │      │Comp│   │
+│  │ Feb 1 ✓  │      │  Feb 2 ✓   │      │Feb 3✗│      │    │   │
+│  └──────────┘      └────────────┘      └──────┘      └────┘   │
+│                                            ↑                     │
+│                                     5 members failed             │
+│                                     (missing DOB)                │
+│                                                                  │
+│  WHY THIS MATTERS:                                              │
+│  • Can answer "where is it?" instantly                          │
+│  • See complete journey across all systems                      │
+│  • Identify exactly where things broke                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**What We Need from Upstream Systems:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  EACH SYSTEM MUST PUBLISH:                                       │
+│                                                                  │
+│  Required Metadata (8 fields):                                  │
+│  1. Transaction ID (generated once, carried through)            │
+│  2. Group Number                                                │
+│  3. Effective Date                                              │
+│  4. System Name (who is publishing)                             │
+│  5. Event Type (what happened)                                  │
+│  6. Status (success/error)                                      │
+│  7. Timestamp                                                   │
+│  8. Member Count                                                │
+│                                                                  │
+│  If Success:                                                    │
+│  • Details of what was processed                                │
+│                                                                  │
+│  If Error:                                                      │
+│  • Error message                                                │
+│  • Which records failed                                         │
+│                                                                  │
+│  Publishing Options (Team's Choice):                            │
+│  ✓ Kafka message (real-time, preferred)                        │
+│  ✓ REST API call (synchronous)                                 │
+│  ✓ File drop (batch, every 15 min)                             │
+│  ✓ Database trigger (automatic)                                │
+│                                                                  │
+│  Integration Effort: 2-3 weeks per system (one-time)           │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### **PILLAR 2: Intelligent Processing**
+
+**Concept:** AI transforms technical errors into business language and routes intelligently
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  THE INTELLIGENCE STACK:                                         │
+│                                                                  │
+│  RAW ERROR (From System):                                       │
+│  "ORA-01400: cannot insert NULL into (EB_MEMBER.DATE_OF_BIRTH)" │
+│                                                                  │
+│           ↓  LAYER 1: Classification (Rules or ML)              │
+│                                                                  │
+│  CLASSIFIED:                                                    │
+│  Category: "Missing Demographics"                               │
+│  Team: "Enrollment Support"                                     │
+│  Priority: P2                                                   │
+│                                                                  │
+│           ↓  LAYER 2: AI Explanation (Claude LLM)               │
+│                                                                  │
+│  PLAIN ENGLISH:                                                 │
+│  Summary: "5 children in Group ABC123 cannot be enrolled        │
+│            because their birth dates are missing from the       │
+│            enrollment file."                                    │
+│                                                                  │
+│  Root Cause: "Sales system doesn't capture DOB for dependents  │
+│               under age 2."                                     │
+│                                                                  │
+│  Business Impact: "These children won't get ID cards.          │
+│                    Employer will notice incomplete enrollment." │
+│                                                                  │
+│  Recommended Action: "Contact sales rep John Doe to obtain     │
+│                       missing birth dates. Update in           │
+│                       EnrollPoint. Resolution time: 2-4 hours."│
+│                                                                  │
+│           ↓  LAYER 3: Intelligent Routing                       │
+│                                                                  │
+│  ACTIONS TAKEN:                                                 │
+│  ✓ Ticket created in Enrollment queue with full context        │
+│  ✓ Slack alert sent to team lead                               │
+│  ✓ Email sent to sales rep                                     │
+│  ✓ Dashboard updated with status                               │
+│                                                                  │
+│  TIME: 10 seconds (vs 2 days manual triage)                    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Components:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  MONTH 1-6: FOUNDATION INTELLIGENCE                             │
+│                                                                  │
+│  Classification Engine (Rule-Based):                            │
+│  • 30-50 pattern matching rules                                │
+│  • 80% accuracy from Day 1                                     │
+│  • No training data needed                                     │
+│  • Example: "missing.*DOB" → "Missing Demographics"           │
+│                                                                  │
+│  AI Summarization (Claude LLM):                                │
+│  • Explains errors in plain English                            │
+│  • Provides root cause analysis                                │
+│  • Recommends specific actions                                 │
+│  • Works from Day 1                                            │
+│                                                                  │
+│  ──────────────────────────────────────────────────────────────│
+│                                                                  │
+│  MONTH 7+: ADVANCED INTELLIGENCE                                │
+│                                                                  │
+│  Machine Learning (if needed):                                  │
+│  • Train on 1000+ production examples                          │
+│  • Deploy only if beats rules by >10%                          │
+│  • 85-92% accuracy potential                                   │
+│                                                                  │
+│  Agentic Capabilities:                                          │
+│  • Auto-remediation (fix common issues automatically)          │
+│  • Proactive monitoring (predict before failure)               │
+│  • Self-learning (improve over time)                           │
+│  • 60% exceptions self-heal                                    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### **PILLAR 3: Time Travel & Audit**
+
+**Concept:** Complete, immutable event history for compliance and debugging
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  THE AUDIT TRAIL:                                               │
+│                                                                  │
+│  Every event is permanently stored (immutable log)              │
+│  Can reconstruct state at ANY point in time                     │
+│                                                                  │
+│  USE CASES:                                                     │
+│                                                                  │
+│  1. COMPLIANCE AUDIT                                            │
+│     Auditor: "Prove member was eligible on March 15th"         │
+│                                                                  │
+│     Response (2 minutes):                                       │
+│     ┌──────────────────────────────────────────────────────┐   │
+│     │ Member: Jane Doe (ID: 67890)                         │   │
+│     │ Date: March 15, 2026                                 │   │
+│     │                                                       │   │
+│     │ Timeline:                                             │   │
+│     │ Mar 1:  Enrolled ✓                                   │   │
+│     │ Mar 10: PCP assigned ✓                               │   │
+│     │ Mar 12: Billing setup ✓                              │   │
+│     │ Mar 15: Coverage ACTIVE ✓                            │   │
+│     │ Mar 20: ID card mailed ✓                             │   │
+│     │                                                       │   │
+│     │ Status on March 15: ELIGIBLE                         │   │
+│     │ [Download Full PDF Audit Report]                     │   │
+│     └──────────────────────────────────────────────────────┘   │
+│                                                                  │
+│  2. DEBUGGING                                                   │
+│     "This group worked yesterday, broken today - what changed?" │
+│                                                                  │
+│     Query: Show events between March 14-15                      │
+│     Result: System update at 2 AM changed validation rule       │
+│                                                                  │
+│  3. MIGRATION VALIDATION                                        │
+│     "Did all 50,000 groups load correctly?"                     │
+│                                                                  │
+│     Compare: Baseline (legacy) vs Actual (new system)           │
+│     Result: 98.5% exact match, 1.5% explained variances        │
+│                                                                  │
+│  4. NATURAL LANGUAGE QUERIES (Future)                           │
+│     "Tell me the story of Group ABC123"                         │
+│                                                                  │
+│     AI generates comprehensive narrative from events            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## **Slide 5: Technical Architecture (Conceptual)**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      HOW DATA FLOWS                              │
+│                                                                  │
+│  LEFT SIDE                  MIDDLE                RIGHT SIDE     │
+│  (What Systems Do)          (Infrastructure)     (Our Intelligence)│
+│                                                                  │
+│  ┌──────────────┐          ┌──────────┐         ┌────────────┐ │
+│  │  SellPoint   │          │          │         │ Status     │ │
+│  │  (Sales)     │──┐       │          │    ┌────│ Tracking   │ │
+│  └──────────────┘  │       │  Kafka   │    │    └────────────┘ │
+│                    │       │  (Event  │    │                    │
+│  ┌──────────────┐  ├──────▶│   Bus)   │────┤    ┌────────────┐ │
+│  │ EnrollPoint  │  │       │          │    │    │ Exception  │ │
+│  │ (Enrollment) │──┤       │          │    ├────│ Intelligence│
+│  └──────────────┘  │       └──────────┘    │    └────────────┘ │
+│                    │            │           │                    │
+│  ┌──────────────┐  │            ↓           │    ┌────────────┐ │
+│  │    ORMB      │  │       ┌──────────┐    │    │  Migration │ │
+│  │  (Billing)   │──┤       │PostgreSQL│    ├────│  Dashboard │ │
+│  └──────────────┘  │       │ Database │    │    └────────────┘ │
+│                    │       │  (Storage)│   │                    │
+│  ┌──────────────┐  │       └──────────┘    │    ┌────────────┐ │
+│  │ EB Compute   │  │            │           │    │    AI      │ │
+│  │ (Eligibility)│──┤            ↓           └────│  Analysis  │ │
+│  └──────────────┘  │       ┌──────────┐         └────────────┘ │
+│                    │       │  Claude  │                         │
+│  ┌──────────────┐  │       │   LLM    │                         │
+│  │    SIP       │  │       │   API    │                         │
+│  │ (Integration)│──┘       └──────────┘                         │
+│  └──────────────┘                                               │
+│                                                                  │
+│  WHAT SYSTEMS PUBLISH:                                          │
+│  • Transaction ID                 WHAT WE BUILD:                │
+│  • Event details                  • Status dashboards           │
+│  • Success/Error status           • AI summarization            │
+│                                   • Smart routing               │
+│  HOW THEY PUBLISH:                • Migration validation        │
+│  • Kafka (real-time)             • Audit reports                │
+│  • REST API (sync)               • Time travel queries          │
+│  • File drop (batch)                                            │
+│  • Auto-trigger (DB)                                            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Technology Choices (Simple & Proven):**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  INFRASTRUCTURE STACK:                                           │
+│                                                                  │
+│  Event Bus:        Kafka                                        │
+│                    (Industry standard, Netflix/Uber/LinkedIn)   │
+│                                                                  │
+│  Database:         PostgreSQL                                   │
+│                    (Handles transactions + analytics)           │
+│                    (Can add Iceberg later for big data)         │
+│                                                                  │
+│  AI Engine:        Claude API (Anthropic)                       │
+│                    (Cloud-hosted, no infrastructure)            │
+│                                                                  │
+│  Classification:   Rule-based → ML (when have data)             │
+│                    (Simple patterns → Advanced learning)        │
+│                                                                  │
+│  APIs:             REST (FastAPI)                               │
+│                    (Everyone knows how to use it)               │
+│                                                                  │
+│  Dashboards:       React + D3.js                                │
+│                    (Modern, interactive visualizations)         │
+│                                                                  │
+│  WHY THESE CHOICES:                                             │
+│  ✓ Proven at massive scale (not experimental)                  │
+│  ✓ Cloud-ready (easy to migrate later)                         │
+│  ✓ Low operational overhead (managed services)                 │
+│  ✓ Common skills (easy to hire for)                            │
+│  ✓ Cost-effective ($60K/year infrastructure)                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## **Slide 6: What We Need from Upstream Systems**
+
+### **Integration Requirements (Simple & Flexible)**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  WHAT EACH APPLICATION TEAM MUST DO:                            │
+│                                                                  │
+│  1. PUBLISH EVENTS                                              │
+│     When key actions occur, send us a message with:             │
+│                                                                  │
+│     Required Fields (8 items):                                  │
+│     ├─ Transaction ID (UUID - carry through from upstream)      │
+│     ├─ Group Number                                             │
+│     ├─ Effective Date                                           │
+│     ├─ System Name (e.g., "EnrollPoint")                        │
+│     ├─ Event Type (e.g., "MEMBER_ENROLLED")                     │
+│     ├─ Status ("SUCCESS" or "ERROR")                            │
+│     ├─ Timestamp                                                │
+│     └─ Member Count (if applicable)                             │
+│                                                                  │
+│     If Success: Include what was processed                      │
+│     If Error: Include error message + affected records          │
+│                                                                  │
+│  2. CHOOSE YOUR METHOD (Team's Preference)                      │
+│                                                                  │
+│     Option A: Kafka (Real-time, Preferred)                      │
+│     • Post JSON to Kafka topic                                  │
+│     • Low latency (milliseconds)                                │
+│     • Best for: Real-time tracking                              │
+│                                                                  │
+│     Option B: REST API (Synchronous)                            │
+│     • HTTP POST to our endpoint                                 │
+│     • Get immediate validation response                         │
+│     • Best for: Critical checkpoints                            │
+│                                                                  │
+│     Option C: File Drop (Batch)                                 │
+│     • CSV/JSON files to SFTP location                           │
+│     • Processed every 15 minutes                                │
+│     • Best for: Legacy systems, batch jobs                      │
+│                                                                  │
+│     Option D: Database Trigger (Passive)                        │
+│     • Auto-capture changes on key tables                        │
+│     • No code changes needed                                    │
+│     • Best for: Systems that can't modify code                  │
+│                                                                  │
+│  3. INTEGRATION EFFORT                                          │
+│     • Per System: 2-3 weeks (one-time)                          │
+│     • Can phase in: 2 systems Month 1, 3 more Month 3           │
+│     • We provide: Code examples, testing tools, support         │
+│                                                                  │
+│  4. MIGRATION-SPECIFIC (Month 5)                                │
+│     • Flag migration events with batch ID                       │
+│     • Provide baseline snapshot from legacy                     │
+│     • Same publishing methods apply                             │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### **Example: What SellPoint Publishes**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  SELLPOINT EVENT EXAMPLE:                                        │
+│                                                                  │
+│  Event: Group sale completed                                    │
+│                                                                  │
+│  JSON Message:                                                  │
+│  {                                                              │
+│    "transaction_id": "txn_550e8400-e29b-41d4-a716-446655440000",│
+│    "group_number": "ABC123",                                    │
+│    "effective_date": "2026-03-01",                              │
+│    "system_source": "SellPoint",                                │
+│    "event_type": "GROUP_SALE_COMPLETE",                         │
+│    "event_status": "SUCCESS",                                   │
+│    "event_timestamp": "2026-02-04T10:30:00Z",                   │
+│    "member_count": 200,                                         │
+│    "details": {                                                 │
+│      "sales_rep": "John Doe",                                   │
+│      "plan_code": "HMO-GOLD",                                   │
+│      "employer_name": "Acme Corp"                               │
+│    }                                                            │
+│  }                                                              │
+│                                                                  │
+│  That's it! Simple JSON message, 8 required fields + details    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### **Example: What EnrollPoint Publishes on Error**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  ENROLLPOINT ERROR EVENT EXAMPLE:                               │
+│                                                                  │
+│  Event: Member enrollment failed                                │
+│                                                                  │
+│  JSON Message:                                                  │
+│  {                                                              │
+│    "transaction_id": "txn_550e8400...",  (same ID from SellPoint)│
+│    "group_number": "ABC123",                                    │
+│    "effective_date": "2026-03-01",                              │
+│    "system_source": "EnrollPoint",                              │
+│    "event_type": "MEMBER_ENROLLMENT_ERROR",                     │
+│    "event_status": "ERROR",                                     │
+│    "event_timestamp": "2026-02-04T14:22:00Z",                   │
+│    "member_count": 5,                                           │
+│    "error_details": {                                           │
+│      "error_code": "VAL_001",                                   │
+│      "error_message": "Date of birth required",                 │
+│      "affected_members": [                                      │
+│        {"member_id": "M001", "relationship": "CHILD"},          │
+│        {"member_id": "M002", "relationship": "CHILD"}           │
+│      ]                                                          │
+│    }                                                            │
+│  }                                                              │
+│                                                                  │
+│  Our system receives this and:                                  │
+│  • AI explains: "5 children missing birth dates"               │
+│  • Routes to: Enrollment Team                                   │
+│  • Alerts: Team lead + Sales rep                                │
+│  • Updates: Dashboard shows issue                               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## **Slide 7: Phased Implementation Timeline**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                  │
+│  MONTH 1-2: FOUNDATION                                           │
+│  ══════════════════════                                         │
+│  Build core tracking capabilities                               │
+│                                                                  │
+│  Left Side (Application Teams):                                 │
+│  ├─ SellPoint: Publish events (2 weeks)                         │
+│  └─ EnrollPoint: Publish events (2 weeks)                       │
+│                                                                  │
+│  Right Side (Our Team):                                         │
+│  ├─ Kafka → Database pipeline                                   │
+│  ├─ Rule-based classification (30 patterns)                     │
+│  ├─ Claude LLM integration for summaries                        │
+│  ├─ Status tracking dashboard                                   │
+│  └─ Basic alerting (Slack/email)                                │
+│                                                                  │
+│  DELIVERABLE:                                                   │
+│  ✓ "Where is Group XYZ?" answered in 2 seconds                 │
+│  ✓ Exceptions explained in plain English                        │
+│  ✓ 80% routing accuracy with rules                             │
+│                                                                  │
+│  SUCCESS METRIC:                                                │
+│  100% of pilot events captured and visible on dashboard         │
+│                                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  MONTH 3-4: SCALE TO ALL SYSTEMS                                 │
+│  ═══════════════════════════                                    │
+│  Expand coverage, enhance intelligence                          │
+│                                                                  │
+│  Left Side:                                                     │
+│  ├─ ORMB: Publish events (2-3 weeks)                            │
+│  ├─ EB Compute: Publish events (2-3 weeks)                      │
+│  └─ SIP: Publish events (2-3 weeks)                             │
+│                                                                  │
+│  Right Side:                                                    │
+│  ├─ Expand rule library (50+ patterns)                          │
+│  ├─ Time travel query interface                                 │
+│  ├─ Enhanced dashboards (multi-system view)                     │
+│  └─ Collect training data for ML (1000+ labeled examples)       │
+│                                                                  │
+│  DELIVERABLE:                                                   │
+│  ✓ Full lifecycle tracking across 5 systems                     │
+│  ✓ Time travel: "Show me what happened last week"              │
+│  ✓ Natural language queries                                     │
+│                                                                  │
+│  SUCCESS METRIC:                                                │
+│  All 5 systems publishing, 85% exception routing accuracy       │
+│                                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  MONTH 5-6: MIGRATION READY                                      │
+│  ═══════════════════════                                        │
+│  Build migration-specific capabilities                          │
+│                                                                  │
+│  Left Side:                                                     │
+│  ├─ Capture baseline from legacy system                         │
+│  └─ Flag migration events with batch ID                         │
+│                                                                  │
+│  Right Side:                                                    │
+│  ├─ Migration command center dashboard                          │
+│  ├─ Automated reconciliation engine                             │
+│  ├─ AI variance explanations                                    │
+│  ├─ Top 10 auto-fix scripts                                     │
+│  └─ Executive reporting                                         │
+│                                                                  │
+│  DELIVERABLE:                                                   │
+│  ✓ Real-time migration tracking                                │
+│  ✓ 90% auto-reconciliation                                     │
+│  ✓ 2-week certification (vs 12 weeks)                          │
+│                                                                  │
+│  SUCCESS METRIC:                                                │
+│  Dry-run migration test shows 90%+ auto-reconciliation          │
+│                                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  MONTH 7-9: INTELLIGENT AUTOMATION                               │
+│  ══════════════════════════════                                 │
+│  Add ML and agentic capabilities (if beneficial)                │
+│                                                                  │
+│  Left Side:                                                     │
+│  └─ No additional work (systems already integrated)             │
+│                                                                  │
+│  Right Side:                                                    │
+│  ├─ Train ML classifier (now have 1000+ examples)               │
+│  ├─ Deploy ML if beats rules by >10%                            │
+│  ├─ Auto-remediation agent (dry-run mode first)                 │
+│  ├─ Proactive monitoring (predict issues)                       │
+│  └─ Continuous learning pipeline                                │
+│                                                                  │
+│  DELIVERABLE:                                                   │
+│  ✓ 40-60% exceptions auto-resolve                              │
+│  ✓ Predictive alerting                                         │
+│  ✓ Self-healing system                                         │
+│                                                                  │
+│  SUCCESS METRIC:                                                │
+│  ML accuracy >85%, auto-fix success rate >90%                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key Principle:** Each phase delivers standalone value. Can stop after any phase if needed.
+
+---
+
+## **Slide 8: Business Case & ROI**
+
+### **Investment Required**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  ONE-TIME INVESTMENT:                                           │
+│                                                                  │
+│  Development (6 months):                   $300,000             │
+│  ├─ Right-side team (intelligence layer)   $200,000            │
+│  ├─ Left-side coordination (Anil)          $50,000             │
+│  └─ Infrastructure setup                    $50,000             │
+│                                                                  │
+│  ANNUAL OPERATING COSTS:                                        │
+│                                                                  │
+│  Infrastructure (Kafka, Database, AI):     $60,000/year        │
+│  Maintenance & Support:                     $40,000/year        │
+│                                                                  │
+│  TOTAL FIRST YEAR:                          $400,000            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### **Value Delivered (Annual)**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  OPERATIONAL EFFICIENCY:                   $500,000/year        │
+│  ├─ Manual investigation time eliminated   $320,000            │
+│  │   (100 hrs/week → 20 hrs/week)                              │
+│  ├─ Exception resolution acceleration      $180,000            │
+│  │   (5 days → 2 hours average)                                │
+│                                                                  │
+│  MIGRATION VALUE:                          $400,000/year        │
+│  ├─ 2 migrations/year × $200K savings each                      │
+│  │   (12 weeks → 2 weeks reconciliation)                       │
+│                                                                  │
+│  RISK REDUCTION:                           $500,000/year        │
+│  ├─ Compliance violations avoided          $300,000            │
+│  ├─ Member retention (fewer issues)        $150,000            │
+│  ├─ Audit efficiency                       $50,000             │
+│                                                                  │
+│  ────────────────────────────────────────────────────────────  │
+│  TOTAL ANNUAL VALUE:                       $1,400,000          │
+│                                                                  │
+│  YEAR 1 ROI: 250%                                               │
+│  PAYBACK PERIOD: 4 months after first migration                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### **Value Realization Timeline**
+
+```
+Month 3: Early Wins
+├─ Status tracking live → Reduce "where's my group?" calls
+├─ AI summaries working → Faster exception understanding
+└─ Value: $50K saved (faster triage)
+
+Month 6: Migration Success
+├─ First migration tracked in real-time
+├─ 90% auto-reconciliation achieved
+├─ 2-week certification vs 12-week baseline
+└─ Value: $200K cumulative
+
+Month 12: Full Automation
+├─ All systems integrated
+├─ ML-powered routing (if deployed)
+├─ Auto-remediation handling routine issues
+└─ Value: $650K cumulative
+
+Year 2: Ongoing Value
+├─ Annual operational savings: $500K
+├─ 2 migrations/year: $400K
+├─ Risk reduction: $500K
+└─ Annual value: $1.4M
+```
+
+---
+
+## **Slide 9: Why This Design Is Right**
+
+### **Design Principles**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  1. START SIMPLE, SCALE SMART                                   │
+│     ────────────────────────────────────────────────────────    │
+│     Month 1: Rules (80% accuracy)                               │
+│     Month 7: Add ML only if it improves by >10%                 │
+│     → Don't over-engineer Day 1                                 │
+│                                                                  │
+│  2. USE PROVEN, BORING TECHNOLOGY                               │
+│     ────────────────────────────────────────────────────────    │
+│     Kafka: Used by Netflix, Uber, LinkedIn                      │
+│     PostgreSQL: Industry standard for 25+ years                 │
+│     Claude API: Cloud-hosted, no infrastructure                 │
+│     → Not experimental, not bleeding edge                       │
+│                                                                  │
+│  3. MEET TEAMS WHERE THEY ARE                                   │
+│     ────────────────────────────────────────────────────────    │
+│     4 publishing options (Kafka/API/File/Trigger)               │
+│     Teams choose what works for them                            │
+│     Phased integration (not big bang)                           │
+│     → Flexibility reduces friction                              │
+│                                                                  │
+│  4. VALUE AT EVERY PHASE                                        │
+│     ────────────────────────────────────────────────────────    │
+│     Month 2: Status tracking works                              │
+│     Month 4: Full lifecycle visibility                          │
+│     Month 6: Migration ready                                    │
+│     Month 9: Intelligent automation                             │
+│     → Each phase justifies itself                               │
+│                                                                  │
+│  5. INTELLIGENCE WHERE IT MATTERS                               │
+│     ────────────────────────────────────────────────────────    │
+│     LLM for explanation (human understanding)                   │
+│     ML for classification (when we have data)                   │
+│     Rules for known patterns (fast & explainable)               │
+│     → Right tool for each job                                   │
+│                                                                  │
+│  6. CLOUD-READY, FUTURE-PROOF                                   │
+│     ────────────────────────────────────────────────────────    │
+│     Modern architecture (event-driven)                          │
+│     Standard protocols (REST, Kafka)                            │
+│     Managed services (low operational burden)                   │
+│     → Easy to migrate to cloud later                            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### **Industry Validation**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  COMPANIES USING SIMILAR ARCHITECTURE:                          │
+│                                                                  │
+│  Amazon (Order Tracking):                                       │
+│  ├─ Event sourcing for package lifecycle                        │
+│  ├─ Real-time status across warehouses                          │
+│  └─ "Where's my package?" answered instantly                    │
+│                                                                  │
+│  Uber (Trip Tracking):                                          │
+│  ├─ Events for every stage (request→match→pickup→dropoff)       │
+│  ├─ Real-time location and status                               │
+│  └─ Exception handling for delays/issues                        │
+│                                                                  │
+│  Stripe (Payment Processing):                                   │
+│  ├─ Event-driven architecture for transactions                  │
+│  ├─ ML for fraud detection                                      │
+│  └─ Complete audit trail for compliance                         │
+│                                                                  │
+│  OUR DESIGN:                                                    │
+│  • Same patterns, healthcare domain                             │
+│  • SIMPLER than these examples (5 systems vs 100s)             │
+│  • Proven approach, not experimental                            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## **Slide 10: The Ask**
+
+### **What We Need to Proceed**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  1. EXECUTIVE APPROVAL                                          │
+│     ────────────────────────────────────────────────────────    │
+│     ✓ Approve $400K investment (development + infrastructure)   │
+│     ✓ Commit to 6-month timeline for migration readiness        │
+│     ✓ Assign executive sponsor                                  │
+│                                                                  │
+│  2. ORGANIZATIONAL COMMITMENT                                   │
+│     ────────────────────────────────────────────────────────    │
+│     ✓ Mandate event publishing across all systems               │
+│     ✓ Application teams allocate 2-3 weeks integration effort   │
+│     ✓ Remove cross-team blockers                                │
+│                                                                  │
+│  3. PHASED TEAM INTEGRATION                                     │
+│     ────────────────────────────────────────────────────────    │
+│     Month 1-2:                                                  │
+│     ├─ SellPoint team: 2-3 weeks integration                    │
+│     └─ EnrollPoint team: 2-3 weeks integration                  │
+│                                                                  │
+│     Month 3-4:                                                  │
+│     ├─ ORMB team: 2-3 weeks integration                         │
+│     ├─ EB Compute team: 2-3 weeks integration                   │
+│     └─ SIP team: 2-3 weeks integration                          │
+│                                                                  │
+│  4. SUCCESS CRITERIA AGREEMENT                                  │
+│     ────────────────────────────────────────────────────────    │
+│     Month 2: Status tracking operational                        │
+│     Month 4: All systems publishing events                      │
+│     Month 6: Migration-ready with 90% auto-reconciliation       │
+│                                                                  │
+│  5. GO/NO-GO CHECKPOINTS                                        │
+│     ────────────────────────────────────────────────────────    │
+│     After each phase: Evaluate value delivered                  │
+│     Can stop if not meeting expectations                        │
+│     Incremental commitment, not all-or-nothing                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### **Decision Required Today**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                  │
+│  ☐ APPROVED                                                     │
+│     Proceed with detailed design and team kickoff               │
+│     Start pilot integration with SellPoint & EnrollPoint        │
+│                                                                  │
+│  ☐ APPROVED WITH CONDITIONS                                     │
+│     Clarifications needed on: _____________________________     │
+│                                                                  │
+│  ☐ DEFER                                                        │
+│     Additional information required: _______________________    │
+│                                                                  │
+│  NEXT STEP IF APPROVED:                                         │
+│  Week 2: Architecture deep-dive with technical teams            │
+│  Week 3: Finalize metadata standards                            │
+│  Week 4: Kickoff with pilot teams                               │
+│  Month 2: First demo of working system                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## **Slide 11: What Happens If We Don't Do This?**
+
+### **Cost of Inaction**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  NEAR-TERM (Next 6 Months):                                     │
+│  ────────────────────────────────────────────────────────────   │
+│  ❌ Next migration = high risk                                  │
+│     • 12-week manual reconciliation                             │
+│     • Business uncertainty delays transformation                │
+│     • Potential data integrity issues undiscovered for weeks    │
+│                                                                  │
+│  ❌ Exception chaos continues                                   │
+│     • 5-day resolution times                                    │
+│     • 100 hours/week wasted on manual triage                    │
+│     • $250K operational cost in next 6 months                   │
+│                                                                  │
+│  ❌ "Where's my group?" remains unanswered                      │
+│     • Business stakeholder frustration                          │
+│     • Sales team loses confidence                               │
+│     • Member complaints escalate                                │
+│                                                                  │
+│  ──────────────────────────────────────────────────────────────│
+│                                                                  │
+│  MEDIUM-TERM (Next 2 Years):                                    │
+│  ────────────────────────────────────────────────────────────   │
+│  ❌ Competitive disadvantage                                    │
+│     • Other payers using AI for operations                      │
+│     • We're still doing manual processes                        │
+│                                                                  │
+│  ❌ Technical debt compounds                                    │
+│     • Harder to retrofit event sourcing later                   │
+│     • No training data collected for ML                         │
+│                                                                  │
+│  ❌ Operational costs stay high                                 │
+│     • $1M/year in manual work continues                         │
+│     • Team burnout from repetitive triage                       │
+│                                                                  │
+│  ──────────────────────────────────────────────────────────────│
+│                                                                  │
+│  LONG-TERM (3+ Years):                                          │
+│  ────────────────────────────────────────────────────────────   │
+│  ❌ Cloud migration blocked                                     │
+│     • Can't migrate what you can't observe                      │
+│     • No observability = high cloud risk                        │
+│                                                                  │
+│  ❌ AI/ML opportunity missed                                    │
+│     • No data infrastructure for training                       │
+│     • Competitors have 3-year head start                        │
+│                                                                  │
+│  ❌ Business transformation stalled                             │
+│     • Can't measure what you can't see                          │
+│     • Process improvement impossible without data               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**The window is now:** New systems being built = easiest integration point
+
+---
+
+## **Slide 12: Summary - Three Key Messages**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                  │
+│  1️⃣  SOLVES REAL BUSINESS PROBLEMS                              │
+│     ────────────────────────────────────────────────────────    │
+│     Not a "nice to have" tech project                           │
+│     Directly impacts:                                           │
+│     • Member experience (faster, fewer errors)                  │
+│     • Operational cost ($500K/year savings)                     │
+│     • Migration success (de-risk transformation)                │
+│     • Regulatory compliance (audit-ready)                       │
+│                                                                  │
+│  ──────────────────────────────────────────────────────────────│
+│                                                                  │
+│  2️⃣  MIGRATION IS THE KILLER USE CASE                           │
+│     ────────────────────────────────────────────────────────    │
+│     Traditional approach:                                       │
+│     • 12 weeks to certify                                       │
+│     • Manual reconciliation nightmare                           │
+│     • Business uncertainty                                      │
+│                                                                  │
+│     Our approach:                                               │
+│     • 2 weeks to certify                                        │
+│     • 90% auto-reconciliation                                   │
+│     • Real-time validation                                      │
+│     • Executive confidence Day 1                                │
+│                                                                  │
+│     ROI proven in first migration event                         │
+│                                                                  │
+│  ──────────────────────────────────────────────────────────────│
+│                                                                  │
+│  3️⃣  PRAGMATIC APPROACH, PROVEN PATTERNS                        │
+│     ────────────────────────────────────────────────────────    │
+│     Start simple:                                               │
+│     • Month 1: Status tracking (immediate value)                │
+│     • Month 4: Full lifecycle visibility                        │
+│     • Month 6: Migration ready                                  │
+│     • Month 9: Intelligent automation                           │
+│                                                                  │
+│     Use proven technology:                                      │
+│     • Same patterns as Amazon, Uber, Stripe                     │
+│     • Industry-standard tools (not experimental)                │
+│     • Cloud-ready architecture                                  │
+│                                                                  │
+│     Value at every phase:                                       │
+│     • Each phase pays for itself                                │
+│     • Can stop after any phase if needed                        │
+│     • Go/no-go checkpoints built in                             │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## **Backup Slide: FAQ**
+
+**Q: Why not just use existing monitoring tools?**  
+A: Monitoring tools track system health (CPU, memory). We track business transactions across systems. Different problems require different solutions.
+
+**Q: What if a system can't publish events?**  
+A: We offer 4 methods (Kafka/API/File/DB trigger). At least one will work for every system.
+
+**Q: Is this HIPAA compliant?**  
+A: Yes. Events contain only IDs and business keys, no PII. Encrypted storage. Audit trail is built-in compliance feature.
+
+**Q: How does this help with cloud migration?**  
+A: Observability is a prerequisite for cloud. Can't migrate systems you can't see. Our framework provides the visibility needed for confident cloud migration.
+
+**Q: What's the training burden for teams?**  
+A: Minimal. Publishing = one-time 2-3 week integration. Consumption = self-service dashboards and APIs. We provide code examples and support.
+
+**Q: Can we start smaller?**  
+A: Yes. Phase 1 is already small (2 systems, 2 months). But going smaller reduces value and makes ROI harder to justify.
+
+**Q: What if AI makes mistakes?**  
+A: Human validation loop built-in. Confidence scores shown. System improves over time with feedback. Rules provide fallback.
+
+**Q: Why not build this later?**  
+A: Window is now - new systems being built. Retrofitting event sourcing into production systems is 3x harder and more expensive.
+
+---
+
+**END OF PRESENTATION**
+
+---
+
+This final deck gives you everything you need to get executive approval:
+- ✅ Clear business problems
+- ✅ Concrete use cases with before/after
+- ✅ Simple explanation of how it works
+- ✅ Specific integration requirements
+- ✅ Realistic timeline and costs
+- ✅ Strong ROI justification
+- ✅ Risk mitigation (what if we don't do this)
+
+The deck focuses on BUSINESS VALUE, not technical complexity. The intelligence (LLM, ML, rules) is presented as "how we solve the problem" not as the problem itself.
+
+Ready to present! 🚀
