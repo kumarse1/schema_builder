@@ -1,0 +1,267 @@
+Ground Rules: When to Use What
+The Decision Framework
+┌─────────────────────────────────────────────────────────┐
+│                    START HERE                            │
+│              What is your problem?                       │
+└─────────────────────┬───────────────────────────────────┘
+                      │
+          ┌───────────▼────────────┐
+          │  Is the task well-     │
+          │  defined with fixed    │──── YES ──→  MICROSERVICE
+          │  input/output?         │              (just do the job)
+          └───────────┬────────────┘
+                      │ NO
+          ┌───────────▼────────────┐
+          │  Does it require       │
+          │  reasoning, judgment,  │──── YES ──→  AGENT
+          │  or decision-making?   │              (think then act)
+          └───────────┬────────────┘
+                      │ NO
+          ┌───────────▼────────────┐
+          │  Does it need multi-   │
+          │  step coordination     │──── YES ──→  AGENTIC SYSTEM
+          │  across many tools?    │              (multiple agents
+          └───────────┬────────────┘               working together)
+                      │ NO
+          ┌───────────▼────────────┐
+          │  Is it a simple        │
+          │  request/response?     │──── YES ──→  PLAIN API
+          └────────────────────────┘
+
+
+
+Side-by-Side Comparison
+MICROSERVICE                 AGENT                    AGENTIC SYSTEM
+ ────────────                 ─────                    ──────────────
+
+ ┌──────────┐           ┌──────────────┐          ┌──────────────────┐
+ │  INPUT   │           │    GOAL      │          │   BIG GOAL       │
+ └────┬─────┘           └──────┬───────┘          └───────┬──────────┘
+      │                        │                          │
+      ▼                        ▼                          ▼
+ ┌──────────┐           ┌──────────────┐          ┌──────────────────┐
+ │  Fixed   │           │   Thinks &   │          │  Planner Agent   │
+ │  Logic   │           │   Plans      │          │  breaks it down  │
+ └────┬─────┘           └──────┬───────┘          └───────┬──────────┘
+      │                        │                          │
+      ▼                        ▼                    ┌─────┼──────┐
+ ┌──────────┐           ┌──────────────┐           ▼     ▼      ▼
+ │  OUTPUT  │           │  Uses Tools  │       ┌──────┐┌────┐┌──────┐
+ └──────────┘           └──────┬───────┘       │Agent ││Agt ││Agent │
+                               │               │  A   ││ B  ││  C   │
+                               ▼               └──┬───┘└──┬─┘└──┬───┘
+                        ┌──────────────┐          │       │     │
+                        │  Evaluates   │          ▼       ▼     ▼
+                        │  "Good       │       ┌──────────────────┐
+                        │   enough?"   │       │  Results merge   │
+                        └──────┬───────┘       └────────┬─────────┘
+                          NO╱    ╲YES                   │
+                          ╱       ╲                     ▼
+                     loops      ┌──────┐         ┌──────────────┐
+                     back       │RESULT│         │ FINAL RESULT │
+                                └──────┘         └──────────────┘
+
+ Predictable            Adaptive               Collaborative
+ Fast                   Smart                  Orchestrated
+ One job                One goal               Many goals
+
+
+
+The Cheat Sheet: 5 Ground Rules
+╔══════════════════════════════════════════════════════════════════════╗
+║                                                                      ║
+║   RULE 1: "CAN YOU WRITE AN IF-ELSE FOR IT?"                        ║
+║   ┌─────────────────────────────────────────┐                        ║
+║   │  YES → Microservice                     │                        ║
+║   │  NO  → Agent                            │                        ║
+║   └─────────────────────────────────────────┘                        ║
+║                                                                      ║
+║   Example:                                                           ║
+║   • "Convert PDF to text"       → if/else works → MICROSERVICE      ║
+║   • "Summarize this PDF and                                          ║
+║     decide what to do with it"  → needs judgment → AGENT             ║
+║                                                                      ║
+╠══════════════════════════════════════════════════════════════════════╣
+║                                                                      ║
+║   RULE 2: "HOW MANY STEPS ARE UNKNOWN UPFRONT?"                     ║
+║   ┌─────────────────────────────────────────┐                        ║
+║   │  Steps known     → Microservice         │                        ║
+║   │  Steps unknown   → Agent                │                        ║
+║   │  Many unknown    → Agentic System       │                        ║
+║   └─────────────────────────────────────────┘                        ║
+║                                                                      ║
+║   ┌──────────────┐  ┌──────────────┐  ┌────────────────────┐        ║
+║   │ Step1→Step2  │  │ Step1→ ???   │  │ ???→ ???→ ???→ ???  │        ║
+║   │  →Step3→Done │  │  → ??? →Done │  │  → ???→ ??? →Done  │        ║
+║   │ MICROSERVICE │  │    AGENT     │  │  AGENTIC SYSTEM    │        ║
+║   └──────────────┘  └──────────────┘  └────────────────────┘        ║
+║                                                                      ║
+╠══════════════════════════════════════════════════════════════════════╣
+║                                                                      ║
+║   RULE 3: "DOES IT NEED TO RECOVER FROM FAILURE?"                    ║
+║   ┌─────────────────────────────────────────┐                        ║
+║   │  Fails → return error   → Microservice  │                        ║
+║   │  Fails → try another    → Agent         │                        ║
+║   │          way                             │                        ║
+║   └─────────────────────────────────────────┘                        ║
+║                                                                      ║
+║   Microservice:          Agent:                                      ║
+║   "File not found"       "File not found...                         ║
+║    → Error 404            let me search elsewhere                    ║
+║                           → found it on backup                       ║
+║                           → done!"                                   ║
+║                                                                      ║
+╠══════════════════════════════════════════════════════════════════════╣
+║                                                                      ║
+║   RULE 4: "WHO DECIDES WHAT TO DO NEXT?"                             ║
+║   ┌─────────────────────────────────────────┐                        ║
+║   │  Developer writes the flow → Microservice│                       ║
+║   │  AI decides at runtime     → Agent       │                       ║
+║   └─────────────────────────────────────────┘                        ║
+║                                                                      ║
+║   Microservice: Developer pre-programs every path                    ║
+║   Agent:        LLM chooses the next action dynamically              ║
+║                                                                      ║
+╠══════════════════════════════════════════════════════════════════════╣
+║                                                                      ║
+║   RULE 5: "WHAT IS THE COST OF BEING WRONG?"                        ║
+║   ┌─────────────────────────────────────────┐                        ║
+║   │  High risk (payments, medical)           │                       ║
+║   │    → Microservice (deterministic)        │                       ║
+║   │                                          │                       ║
+║   │  Low risk (drafts, research, search)     │                       ║
+║   │    → Agent (creative, flexible)          │                       ║
+║   │                                          │                       ║
+║   │  Mixed → Agent + human approval gate     │                       ║
+║   └─────────────────────────────────────────┘                        ║
+║                                                                      ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+
+
+
+How Is an Agentic System Configured?
+This is where the rules and config come in:
+╔═══════════════════════════════════════════════════════════════════╗
+║               ANATOMY OF AN AGENT CONFIG                         ║
+╠═══════════════════════════════════════════════════════════════════╣
+║                                                                   ║
+║  ┌─────────────────────────────────────────────────────────┐     ║
+║  │                                                         │     ║
+║  │  AGENT CONFIG = 5 THINGS                                │     ║
+║  │                                                         │     ║
+║  │  1. SYSTEM PROMPT     → "You are a customer support     │     ║
+║  │     (personality         agent. Be polite. Always       │     ║
+║  │      & rules)            verify the order number."      │     ║
+║  │                                                         │     ║
+║  │  2. TOOLS             → [search_orders, send_email,     │     ║
+║  │     (what it CAN do)     check_inventory, issue_refund] │     ║
+║  │                                                         │     ║
+║  │  3. GUARDRAILS        → "Never refund > $500 without    │     ║
+║  │     (what it CAN'T do)   human approval"                │     ║
+║  │                                                         │     ║
+║  │  4. MEMORY/CONTEXT    → conversation history, user      │     ║
+║  │     (what it knows)      profile, past interactions     │     ║
+║  │                                                         │     ║
+║  │  5. ORCHESTRATION     → how agents hand off to each     │     ║
+║  │     (how agents          other, who is the "boss"       │     ║
+║  │      work together)                                     │     ║
+║  │                                                         │     ║
+║  └─────────────────────────────────────────────────────────┘     ║
+║                                                                   ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+
+How the Loop Actually Works
+ THE AGENTIC LOOP (this is what makes it "agentic")
+  ──────────────────────────────────────────────────
+
+       ┌──────────────────┐
+       │   Receive GOAL   │ ← "Handle this customer complaint"
+       └────────┬─────────┘
+                │
+       ┌────────▼─────────┐
+       │   THINK          │ ← LLM reasons: "I need to look up
+       │   (LLM call)     │    their order first"
+       └────────┬─────────┘
+                │
+       ┌────────▼─────────┐
+       │   ACT            │ ← Calls tool: search_orders("12345")
+       │   (tool call)    │
+       └────────┬─────────┘
+                │
+       ┌────────▼─────────┐
+       │   OBSERVE        │ ← Gets result: "Order shipped late"
+       │   (read result)  │
+       └────────┬─────────┘
+                │
+       ┌────────▼─────────┐     ┌─────────────────────┐
+       │   EVALUATE       │     │                     │
+       │   "Am I done?"   ├─NO──▶  Loop back to THINK │
+       │                  │     │                     │
+       └────────┬─────────┘     └─────────────────────┘
+                │ YES
+       ┌────────▼─────────┐
+       │   RESPOND        │ ← "I've issued a 15% discount 
+       │                  │    and emailed the customer"
+       └──────────────────┘
+
+  THIS LOOP IS THE HEART OF "AGENTIC"
+  Without it, you just have an LLM answering questions.
+
+
+
+
+
+The Core Paradigm Shift
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║  TRADITIONAL PROGRAMMING                                      ║
+║  "HOW to do it" (Procedural/Imperative)                      ║
+║                                                               ║
+║  You write:  STEP 1 → STEP 2 → STEP 3                        ║
+║                                                               ║
+║  ───────────────────────────────────────────────────────      ║
+║                                                               ║
+║  AGENTIC PROGRAMMING                                          ║
+║  "WHAT to achieve" (Declarative/Goal-oriented)               ║
+║                                                               ║
+║  You write:  GOAL + CONSTRAINTS + TOOLS                       ║
+║              LLM figures out: STEP ? → STEP ? → STEP ?        ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+The 5 Fundamental Shifts
+SHIFT 1: From "Instructions" to "Outcomes"
+┌─────────────────────────────────────────────────────────────┐
+│  OLD MINDSET: Tell the computer HOW                         │
+│  ────────────────────────────────────                        │
+│  "Do step A, then B, then C"                                │
+│                                                             │
+│  NEW MINDSET: Tell the AI WHAT                              │
+│  ────────────────────────────────                            │
+│  "Achieve this outcome, here are your tools and limits"     │
+│                                                             │
+└───────────────────────────────────────────────────────────
+
+
+
+
+### **SHIFT 2: From "Control Flow" to "Capability Definition"**
+```
+┌─────────────────────────────────────────────────────────────┐
+│  OLD MINDSET: Design the flowchart                          │
+│  ────────────────────────────────────                        │
+│  Draw every if-else branch                                  │
+│  Map every exception path                                   │
+│                                                             │
+│  NEW MINDSET: Define the playing field                      │
+│  ────────────────────────────────                            │
+│  What CAN it do? (tools)                                    │
+│  What MUST it follow? (rules)                               │
+│  What MUST it achieve? (goal)                               │
+│  LLM figures out the path                                   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+
