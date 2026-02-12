@@ -1,0 +1,1290 @@
+  
+Why Router Agent → Specialized Agent?
+
+Current Pain Points
+
+Why Router + Specialized Agents
+
+No common digital fingerprint across systems
+
+One Router classifies & routes — specialists execute
+
+Manual exception triage takes 5+ days avg
+
+Each agent has focused tools & domain context
+
+Monolithic approach can't scale to 12+ event types
+
+Parallel execution for multi-domain exceptions
+
+No learning from historical resolutions
+
+Agents learn independently without cross-contamination
+
+Siloed system knowledge across teams
+
+Add new agents without changing existing ones
+
+A single monolithic AI Agent cannot handle 6 different task types with the same quality — specialize, then orchestrate.
+===================================================================================
+
+
+End-to-End Conceptual Flow
+
+Source
+Systems
+
+Kafka
+Topic
+
+Event
+Consumer
+
+Audit
+DB
+
+Router
+Agent
+
+Specialized
+Agents
+
+How the Router Agent Works
+
+Specialized Agents
+
+Root Cause Analyst
+
+Traces exception through system chain
+
+Receive event from Audit DB (exception or status change)
+
+1
+
+Error Triage Agent
+
+Classifies severity, assigns priority
+
+ML Classifier: Fast classification of known exception types (< 100ms)
+
+2
+
+Auto-Remediation Agent
+
+Fixes known issues via E-walk APIs
+
+LLM Semantic Router: For novel/ambiguous exceptions — understands intent
+
+3
+
+Pattern Recognition Agent
+
+Detects recurring failure clusters
+
+Decision Making Agent
+
+Escalation logic + business rules
+
+Route to best Specialized Agent (or parallel agents for complex issues)
+
+4
+
+Action Execution Agent
+
+Executes fixes, restarts, notifications
+
+
+==============
+
+
+Router Agent — Detailed Architecture
+
+INPUTS
+
+ROUTER AGENT
+
+ROUTING OUTPUT
+
+→  Exception Event
+
+✓  Target Agent(s)
+
+ML Classifier
+
+→  Transaction ID
+
+✓  Priority Level
+
+Pre-trained on known exception patterns
+90% of exceptions classified in < 100ms
+
+→  System Source
+
+✓  Assembled Context
+
+LLM Semantic Router
+
+→  Error Code/Message
+
+✓  Confidence Score
+
+For novel exceptions — reads error message,
+determines intent & routes dynamically
+
+→  Group + Effective Date
+
+✓  Parallel/Sequential Flag
+
+→  Event Lifecycle Stage
+
+✓  Fallback Strategy
+
+Context Assembler
+
+→  Historical Context
+
+Gathers transaction history, related events,
+past resolutions for the same group
+
+ORMB throws 'Missing DOB for dependent enrollment' → ML Classifier (confidence 97%) → Routes to Auto-Remediation Agent → Agent queries legacy DB → Finds DOB → Patches EnrollPoint via E-walk API → Verifies fix → Closes exception
+
+Example:  
+===================
+
+
+
+Agent Interaction Flow — Real-World Scenario
+
+Scenario: Group renewal with 200 members — 3 failed at EnrollPoint, 2 failed at ORMB
+
+Event Published
+
+EnrollPoint publishes 3 TECHNICAL_ERROR events to Kafka with transaction_id, group_number, error_codes
+
+1
+
+Consumer Persists
+
+Event Consumer stores in Audit DB. Reconciliation Process detects member count mismatch (200 expected, 197 succeeded)
+
+2
+
+Router Classifies
+
+Router Agent receives 3 exceptions. ML Classifier: 2 are 'Missing DOB' (known), 1 is 'Plan code mismatch' (novel). Routes accordingly.
+
+3
+
+Parallel Dispatch
+
+Auto-Remediation Agent handles 2 known 'Missing DOB' → queries legacy DB, finds DOBs, patches via E-walk API
+
+4
+
+Root Cause Analysis
+
+Root Cause Analyst traces 'Plan code mismatch' → discovers mapping table updated in SellPoint but not synced to EnrollPoint
+
+5
+
+Decision + Action
+
+Decision Agent: auto-fix confidence < 80% → escalates. Action Agent: creates JIRA, alerts enrollment ops, sends Slack notification
+
+6
+
+Resolution Loop
+
+Human fixes mapping. Action Agent retriggers enrollment. Pattern Agent logs this as new known pattern for future auto-resolution.
+
+7
+========================
+
+
+
+Technical Architecture — Full Stack View
+
+SOURCE
+SYSTEMS
+
+INGESTION
+
+DATA
+LAYER
+
+INTELLIGENCE LAYER
+
+CONSUMERS
+
+Router Agent
+
+Kafka Topic
+
+Dashboard
+
+Audit Events
+
+GEMS
+
+ML + LLM Hybrid
+
+Alerting
+
+EnrollPoint
+
+REST API
+
+Transaction
+Lifecycle
+
+Root Cause
+
+Error Triage
+
+Chatbot
+
+ORMB
+
+Batch Files
+
+Exception
+Registry
+
+Desktop View
+
+Auto-Remediation
+
+Pattern Recog
+
+EB Compute
+
+BI Reports
+
+Resolution
+Patterns
+
+Normalizer
+
+Sapphire
+
+Decision
+
+Action Exec
+
+JIRA/SDLC
+
+PCP Service
+
+Recon
+Engine
+
+Consumer
+
+Slack/Email
+
+PPX
+
+Quality Validation Loop
+
+============================
+
+
+
+Technology Stack & Implementation Blueprint
+
+Agent Orchestration
+
+ML / AI Models
+
+Infrastructure
+
+LangGraph
+
+Exception Classifier
+
+Apache Kafka
+
+Multi-agent workflow orchestration with cycles
+
+Trained on historical testing data
+
+Event streaming backbone
+
+LangChain
+
+Priority Scorer
+
+Apache Iceberg
+
+Tool calling, prompt management, chains
+
+SLA + business impact model
+
+Cloud-ready audit data lake
+
+RAG Pipeline
+
+Anomaly Detector
+
+PostgreSQL
+
+Vector search against Audit DB for context
+
+Time-series spike detection
+
+Operational exception registry
+
+Semantic Router
+
+Clustering
+
+Vector Store
+
+Fast embedding-based classification
+
+Group similar exceptions into patterns
+
+Embeddings for RAG (Pgvector)
+
+Tool Registry
+
+LLM (GPT-4/Claude)
+
+Docker/K8s
+
+E-walk, DB, JIRA, Slack API adapters
+
+Semantic routing, summarization, story
+
+Agent container orchestration
+============================================
+
+
+
+
+Phased Implementation Roadmap
+
+Phase 1
+
+Phase 2
+
+Phase 3
+
+Phase 4
+
+Foundation
+
+Intelligence
+
+Automation
+
+Advanced Agentic
+
+Months 1-2
+
+Months 3-4
+
+Months 5-6
+
+Months 7+
+
+Event publishing from 3 core systems
+
+Router Agent with ML classifier
+
+Auto-Remediation Agent (known fixes)
+
+Full Decision Making Agent
+
+Kafka + Consumer + Audit DB setup
+
+LLM-based semantic routing
+
+Pattern Recognition Agent
+
+Proactive Monitoring Agent
+
+Common metadata & digital fingerprint
+
+Error Triage Agent (auto-assign)
+
+Chatbot interface (NL queries)
+
+Learning feedback loops
+
+Basic reconciliation engine
+
+Root Cause Analyst (basic)
+
+Progress bar / desktop views
+
+Story generation (Gen AI docs)
+
+Exception classification ML training
+
+Dashboard + alerting consumers
+
+SDLC Hub integration
+
+Migration Central integration
+
+
+================================
+
+
+
+
+Task-Based Agents (Avoid)
+
+Domain-Based Agents (Recommended)
+
+Root Cause Analyst
+
+Error Triage Agent
+
+Sales Agent
+
+Enrollment Agent
+
+Auto-Remediation Agent
+
+Pattern Recognition Agent
+
+Billing Agent
+
+Decision Making Agent
+
+Action Execution Agent
+
+Benefits Agent
+
+Technical Agent
+
+Problems with this approach:
+
+✗  Each task agent must know ALL domains (Sales, Enrollment, Billing, Benefits)
+
+Why this works:
+
+✗  Context window explodes — one agent needs every system's rules, APIs, error codes
+
+✓  Each agent is an expert in ONE domain — focused tools, APIs, rules
+
+✗  No clear ownership — who fixes a cross-system issue?
+
+✓  Like your real ops team: Sales Ops, Enrollment Ops, Billing Ops
+
+✗  Like hiring a 'Root Cause person' who knows nothing about your specific systems
+
+✓  Task skills (triage, root cause, fix) live INSIDE each domain agent
+
+✓  Clear ownership: Billing Agent owns all billing exceptions. Period.
+
+Industry best practice (LangChain): "Multi-agent patterns are most valuable when tasks require specialized knowledge with extensive context in distinct verticals."
+
+
+=================
+
+
+
+ORCHESTRATOR (Supervisor Agent)
+
+OUTPUTS
+
+Dashboard
+
+Audit DB
++ Recon Engine
+
+Intent
+Classifier
+
+Context
+Assembler
+
+Multi-Agent
+Coordinator
+
+Quality
+Validator
+
+Alerting
+
+ML + LLM
+
+RAG + DB
+
+Parallel / Sequential
+
+Reflection Loop
+
+Chatbot
+
+DOMAIN SPECIALISTS
+
+JIRA/SDLC
+
+Desktop
+
+Sales
+Agent
+
+Enrollment
+Agent
+
+Billing
+Agent
+
+Benefits
+Agent
+
+Technical
+Agent
+
+Slack/Email
+
+GEMS, SellPoint
+
+EnrollPoint, Sapphire
+
+ORMB, Delinq Mgmt
+
+EB Compute, PPX
+
+PCP, ID Card, Comms
+
+Triage | RCA
+Fix | Route
+
+Triage | RCA
+Fix | Route
+
+Triage | RCA
+Fix | Route
+
+Triage | RCA
+Fix | Route
+
+Triage | RCA
+Fix | Route
+
+The Orchestrator decides WHICH domain agent(s) to invoke. Each domain agent internally handles its own triage, root cause, fix, and routing — like a real ops team.
+
+
+=====================
+
+
+
+RECEIVE
+
+CLASSIFY
+
+1
+
+2
+
+Exception arrives from Recon Engine / Kafka
+
+Determine which domain the exception belongs to
+
+Orchestrator receives the event with transaction_id, error_code, system_source, group_number. It does NOT try to solve the problem — it figures out WHO should.
+
+ML Classifier identifies the domain (Sales/Enrollment/Billing/Benefits/Technical) based on system_source + error_code + event_type. LLM fallback for ambiguous cases.
+
+ASSEMBLE CONTEXT
+
+DISPATCH
+
+3
+
+4
+
+Gather everything the agent needs before dispatching
+
+Route to one or more domain agents
+
+RAG pipeline pulls: transaction lifecycle history, related events from same group, past resolutions for similar exceptions, relevant business rules. Agents get RICH context, not raw errors.
+
+Single-domain: Send to one agent (80% of cases). Cross-domain: Send to multiple agents in parallel, collect results, synthesize. The coordinator decides parallel vs. sequential based on dependency analysis.
+
+VALIDATE
+
+LEARN
+
+5
+
+6
+
+Quality check before actions execute
+
+Feed resolution back into the system
+
+Reflection loop: Did the agent's proposed fix make sense? Is confidence > threshold? If not, route to a different agent or escalate to human. This prevents bad auto-fixes from causing more damage.
+
+Log the resolution pattern. Update ML classifier with new training data. If a novel exception was resolved, add it to the known patterns library. The system gets smarter over time.
+
+
+===========================
+
+
+
+Domain Agent Deep Dive — What Each Agent Owns
+
+Owns: Quote, Proposal, Contract, Group Setup, Renewal
+
+Exception: Group renewal proposal rejected — plan code discontinued
+
+Tools: SellPoint API, GEMS DB, Plan Catalog, Rating Engine
+
+Agent Action: Looks up replacement plan → suggests mapping → auto-updates quote if confidence > 90%
+
+Sales Agent
+
+GEMS, SellPoint/PSP/PEP
+
+Owns: Member enrollment, Demographics, PCP, ID Cards, Benefit Packages
+
+Exception: 3 members failed enrollment — missing date of birth
+
+Tools: EnrollPoint API, Sapphire DB, PCP Service, ID Card Service, E-walk
+
+Agent Action: Queries legacy DB for DOBs → patches via E-walk API → retriggers enrollment → verifies
+
+Enrollment Agent
+
+EnrollPoint, Sapphire, Address Service
+
+Owns: Invoice generation, Payment, Delinquency, Cancellation, Reinstatement
+
+Exception: Invoice generated with wrong rate — premium mismatch
+
+Tools: ORMB API, Billing DB, Payment Gateway, Delinquency Rules Engine
+
+Agent Action: Traces rate to source → finds stale rate table → triggers rate refresh → regenerates invoice
+
+Billing Agent
+
+ORMB, Delinquency Management
+
+Owns: Benefit calculations, Plan configurations, Coverage rules
+
+Exception: Benefit calculation failed — unknown copay structure
+
+Tools: EB Compute API, Plan Config DB, Coverage Rules Engine
+
+Agent Action: Looks up plan template → identifies missing config → creates JIRA for plan setup team
+
+Benefits Agent
+
+EB Compute, PPX
+
+Owns: System timeouts, connectivity, batch failures, file processing errors
+
+Exception: Batch file processing failed — ORMB timeout at row 1,847
+
+Tools: System Health API, Log Aggregator, Batch Scheduler, Infra Monitor
+
+Agent Action: Checks ORMB connection pool → identifies exhaustion → restarts pool → retriggers from row 1,847
+
+Technical Agent
+
+Communications, Infra, Cross-system
+=======================
+
+
+
+Cross-Domain Orchestration — The Hard Problem
+
+When an exception spans multiple domains, the Orchestrator coordinates agents — not individual agents trying to solve the whole thing.
+
+SCENARIO
+
+Group renewal for 500 members. SellPoint shows new plan codes. EnrollPoint rejects 47 members (plan code mismatch). ORMB generates partial invoice.
+This is a CROSS-DOMAIN problem: it started in Sales, manifested in Enrollment, and impacted Billing.
+
+Orchestrator Detects
+
+Recon Engine flags: 47 enrollment failures + partial invoice. Orchestrator sees multiple systems involved → triggers cross-domain protocol.
+
+1
+
+Parallel Dispatch
+
+Enrollment Agent: Analyze 47 failures → finds 'plan code not found'. Sales Agent: Check SellPoint plan mapping → finds new codes not synced. Billing Agent: Assess invoice impact → identifies premium shortfall.
+
+2
+
+Orchestrator Synthesizes
+
+Collects all three reports. Root cause: SellPoint updated plan codes during renewal, mapping table not synced to EnrollPoint. Billing is downstream impact, not root cause.
+
+3
+
+Coordinated Resolution
+
+Sales Agent: Pushes corrected mapping to EnrollPoint. Enrollment Agent: Retriggers 47 members with new codes. Billing Agent: Waits for enrollment success, then regenerates invoice. Sequential dependency managed by Orchestrator.
+
+4
+
+Key principle: Agents never call each other directly. The Orchestrator manages all coordination, dependencies, and sequencing. This prevents circular calls and ensures audit trail.
+=================
+
+
+
+Inside a Domain Agent — Skills, Not Separate Agents
+
+Each domain agent internally has the capability to triage, analyze root cause, auto-fix, and escalate — these are skills, not separate agents.
+
+Enrollment Agent — Internal Anatomy (Example)
+
+Domain Knowledge
+
+Tools (APIs / Actions)
+
+Internal Skills
+
+•  EnrollPoint data model & API contracts
+
+•  EnrollPoint REST API (read/write)
+
+Triage: Classify severity using enrollment-specific rules
+
+•  Sapphire PCP assignment rules
+
+•  E-walk correction APIs
+
+Root Cause: Trace failure through enrollment pipeline
+
+•  Member enrollment lifecycle stages
+
+•  Sapphire PCP Service
+
+Auto-Fix: Apply known fixes via E-walk for this domain
+
+•  ID Card generation requirements
+
+•  ID Card Service trigger
+
+Escalate: Route to enrollment ops team with full context
+
+•  Address validation business rules
+
+•  Address Change Service
+
+Pattern Log: Record new patterns for future learning
+
+•  Known error patterns + fix history
+
+•  Legacy DB query (read-only)
+
+Internal Processing Flow:
+
+Receive
+Context
+
+Triage
+(Severity)
+
+Root Cause
+Analysis
+
+Can
+Auto-Fix?
+
+Execute
+Fix
+
+Verify
+Result
+
+Report to
+Orchestrator
+
+No → Escalate to Human
+===============================
+
+
+
+
+Agent-to-Agent Direct Calls
+
+Fix: All inter-agent communication goes through the Orchestrator. Agents ONLY talk to the Orchestrator, never to each other.
+
+Problem: If the Enrollment Agent calls the Sales Agent directly to get plan mapping, you lose the Orchestrator's visibility and audit trail. Circular dependencies can form.
+
+Technical Agent Becomes a Dumping Ground
+
+Fix: Define clear ownership boundaries. Technical Agent handles ONLY infrastructure/connectivity/batch issues. If it's a business logic error, it belongs to a domain agent — even if the error message looks technical.
+
+Problem: Every ambiguous or unfamiliar exception gets routed to 'Technical Agent' because it doesn't fit neatly into a domain. The agent becomes overloaded and unfocused.
+
+Over-Automating Too Early
+
+Fix: Phase 1: Agents recommend fixes but require human approval. Phase 2: Auto-fix only for exceptions with > 95% confidence. Phase 3: Full autonomy for proven patterns only.
+
+Problem: Auto-fix agents making changes in production before you have confidence in the ML models. A bad auto-fix can corrupt data across systems.
+
+Context Window Overload
+
+Fix: Context Assembler in the Orchestrator should curate context — only send relevant events, recent history, and specific business rules. Use RAG to retrieve on-demand, not dump everything upfront.
+
+Problem: Passing the entire transaction history, all related events, and every business rule into the agent prompt. LLM performance degrades with too much context.
+
+No Feedback Loop
+
+Fix: Every resolution (auto or human) feeds back into: ML classifier training data, known patterns library, and agent prompt updates. Schedule monthly model retraining.
+
+Problem: Agents resolve exceptions but never learn from them. The same exceptions keep appearing because the system doesn't evolve.
+
+
+==============================
+
+
+
+Industry Best Practices — Multi-Agent Design
+
+01
+
+Supervisor Pattern (LangGraph)
+
+The Orchestrator is a supervisor that treats domain agents as callable tools. It maintains conversation state, decides which agent to invoke, and synthesizes results. This is the pattern recommended by LangChain for production multi-agent systems.
+
+LangChain Multi-Agent Architecture Guide
+
+02
+
+Stateless Agents, Stateful Orchestrator
+
+Domain agents should be stateless — they receive full context, process it, and return results. The Orchestrator maintains state across the conversation. This gives you strong context isolation (no agent leaks state to another) with centralized control.
+
+LangGraph Performance Docs
+
+03
+
+Hybrid Routing: ML First, LLM Fallback
+
+Use a fast ML classifier (< 100ms) for known exception types (handles 80-90% of cases). Fall back to LLM-based semantic routing only for novel or ambiguous exceptions. This balances speed, cost, and flexibility.
+
+Semantic Router + Agent Orchestration patterns
+
+04
+
+Reflection Pattern for Quality
+
+Before any agent executes an action in production, a reflection step validates the output. This is a feedback loop where a quality check agent (or the Orchestrator itself) reviews the proposed fix. Critical for preventing bad auto-fixes.
+
+Elastic Labs Multi-Agent System Design
+
+05
+
+Incremental Autonomy
+
+Start with agents that recommend (human approves). Graduate to agents that act (human monitors). Eventually reach agents that learn and act autonomously for proven patterns. Never give full autonomy without a confidence threshold.
+
+Enterprise AI Agent Deployment Best Practice
+
+06
+
+Clear Agent Boundaries = Clear Ownership
+
+In real organizations, domain-based agents mirror the ops team structure: Sales Ops, Enrollment Ops, Billing Ops. This makes it easy to assign accountability, train the agents with team-specific knowledge, and align with existing escalation paths.
+
+Anthropic / LangChain Agent Design Principles
+
+
+======================
+
+
+
+Industry Best Practices — Multi-Agent Design
+
+01
+
+Supervisor Pattern (LangGraph)
+
+The Orchestrator is a supervisor that treats domain agents as callable tools. It maintains conversation state, decides which agent to invoke, and synthesizes results. This is the pattern recommended by LangChain for production multi-agent systems.
+
+LangChain Multi-Agent Architecture Guide
+
+02
+
+Stateless Agents, Stateful Orchestrator
+
+Domain agents should be stateless — they receive full context, process it, and return results. The Orchestrator maintains state across the conversation. This gives you strong context isolation (no agent leaks state to another) with centralized control.
+
+LangGraph Performance Docs
+
+03
+
+Hybrid Routing: ML First, LLM Fallback
+
+Use a fast ML classifier (< 100ms) for known exception types (handles 80-90% of cases). Fall back to LLM-based semantic routing only for novel or ambiguous exceptions. This balances speed, cost, and flexibility.
+
+Semantic Router + Agent Orchestration patterns
+
+04
+
+Reflection Pattern for Quality
+
+Before any agent executes an action in production, a reflection step validates the output. This is a feedback loop where a quality check agent (or the Orchestrator itself) reviews the proposed fix. Critical for preventing bad auto-fixes.
+
+Elastic Labs Multi-Agent System Design
+
+05
+
+Incremental Autonomy
+
+Start with agents that recommend (human approves). Graduate to agents that act (human monitors). Eventually reach agents that learn and act autonomously for proven patterns. Never give full autonomy without a confidence threshold.
+
+Enterprise AI Agent Deployment Best Practice
+
+06
+
+Clear Agent Boundaries = Clear Ownership
+
+In real organizations, domain-based agents mirror the ops team structure: Sales Ops, Enrollment Ops, Billing Ops. This makes it easy to assign accountability, train the agents with team-specific knowledge, and align with existing escalation paths.
+
+Anthropic / LangChain Agent Design Principles
+
+
+=========================================================================
+
+Migration, Issue Management
+& Extensible Event Sources
+
+Expanding the Left Side — From Audit Tracker to Enterprise Event Bus
+
+How migration projects, issue management, SOPs, and future sources
+plug into the same Orchestrator + Domain Agent framework
+
+EBS Event-Driven Audit Framework  |  February 2026
+=======================
+
+
+
+Expanded Left Side — Full Event Source Map
+
+Steady-State Systems
+
+Migration Sources
+
+Extended Sources (Future)
+
+GEMS / SellPoint
+
+Legacy Extract & Load
+
+Issue Management (JIRA/ServiceNow)
+
+Bulk data from mainframe
+
+Defect tickets, incident reports, change requests
+
+EnrollPoint
+
+Migration Batch Process
+
+SOP / Compliance Tracking
+
+ORMB
+
+Wave-based loading
+
+Standard operating procedures, audit compliance, regulatory
+
+EB Compute
+
+Data Validation Pipeline
+
+External Partner Feeds
+
+Pre/post load checks
+
+Broker submissions, clearinghouse, EDI 834/837 errors
+
+Sapphire
+
+Reconciliation Files
+
+Quality Assurance / Testing
+
+PCP Service
+
+Source vs target counts
+
+Test execution results, regression failures, UAT defects
+
+ID Card Service
+
+Conversion Mapping
+
+Customer Service (Call Center)
+
+Plan code / PCP mappings
+
+Member complaints, inquiries mapped to system issues
+
+Communications
+
+The left side is not just 'system audit' — it's an Enterprise Event Bus. Any structured event source can plug in without changing the Orchestrator or agents.
+
+
+===============================
+
+
+
+Migration Project — How It Plugs Into the Framework
+
+Legacy
+Systems
+
+Extract &
+Staging
+
+Batch Load
+Process
+
+EBS Target
+Systems
+
+50K+ groups
+Mainframe data
+
+Validation
+Mapping tables
+
+Loads into EBS
+Systems in waves
+
+SellPoint, EnrollPoint
+ORMB, EB Compute
+
+UNIFIED EVENT BUS (Kafka)  —  Steady-State Events  +  Migration Events  +  Extended Source Events
+
+What Makes Migration Events Different
+
+Volume:  10-100x normal throughput — need Kafka partition scaling and consumer auto-scaling
+
+Metadata:  is_migration_event flag, migration_batch_id, wave_number, legacy_source_id, expected_vs_actual counts
+
+Reconciliation:  Source count from legacy vs loaded count in target — separate migration recon dashboard
+
+Error Patterns:  Different failure types: stale mapping tables, missing legacy data, format mismatches — not runtime errors
+
+Agent Skills:  Domain agents need migration-specific fix patterns: check legacy extract, apply mapping, retrigger batch from checkpoint
+
+
+============================
+
+
+
+Full Architecture — All Event Sources Converging
+
+ORCHESTRATOR + DOMAIN AGENTS
+
+STEADY
+STATE
+
+INGESTION
+
+DATA
+LAYER
+
+CONSUMERS
+
+Dashboard
+
+GEMS
+
+Kafka
+
+Audit Events
+
+Intent Classifier  |  Context Assembler  |  Coordinator  |  Quality Validator
+
+EnrollPoint
+
+Alerting
+
+REST API
+
+Transaction
+Lifecycle
+
+ORMB
+
+Chatbot
+
+Sales
+
+Enrollment
+
+Billing
+
+EB Compute
+
+Batch
+
+Exception
+Registry
+
+JIRA/SDLC
+
+Sapphire
+
+Benefits
+
+Technical
+
+Normalizer
+
+Desktop View
+
+Recon
+Engine
+
+MIGRATION
+
+Migration
+Command Center
+
+Consumer
+
+Legacy Extract
+
+Migration
+Baseline
+
+Migration-Aware Capabilities
+
+• Migration batch tracking & wave coordination
+• Legacy-vs-target reconciliation mode
+• Migration-specific fix patterns per domain agent
+
+SOP Reports
+
+Batch Load
+
+Slack/Email
+
+Extended Source Capabilities
+
+EXTENDED
+
+• JIRA ticket correlation with audit events
+• SOP compliance validation via same agents
+
+JIRA / Issues
+
+SOP / QA
+
+
+==================================
+
+
+
+Issue Management & Beyond — How New Sources Plug In
+
+The architecture is source-agnostic. The Orchestrator and domain agents don't care WHERE an event came from — they care WHAT domain it belongs to.
+
+How: JIRA webhook publishes ticket events to Kafka when a defect is raised. The Orchestrator classifies the domain (e.g., 'ORMB billing calculation error' → Billing Agent). Agent correlates ticket with existing audit exceptions. If a pattern match is found, agent auto-links the ticket to the root cause and suggests a resolution from the known patterns library.
+
+Issue Management (JIRA / ServiceNow)
+
+Example: JIRA ticket: 'Invoice shows wrong premium for Group 12345' → Billing Agent matches to 3 existing ORMB exceptions from last week → auto-comments on JIRA with root cause + fix applied
+
+Close the loop: system exceptions and human-raised tickets converge in one place
+
+How: SOP system publishes compliance checkpoints as events (e.g., 'quarterly benefit audit due for Group X'). Orchestrator routes to Benefits Agent. Agent runs the audit checklist against audit DB, flags any discrepancies, generates compliance report. If violations found, auto-creates corrective action tickets.
+
+SOP / Compliance Tracking
+
+Example: SOP event: 'Annual PCP network compliance check due' → Enrollment Agent runs audit across all groups → finds 12 groups with terminated PCPs still assigned → auto-creates fix requests
+
+Proactive compliance: agents run SOPs automatically instead of waiting for manual audits
+
+How: Call center CRM publishes member inquiry events (e.g., 'member says ID card not received'). Orchestrator routes to Enrollment Agent. Agent checks ID Card Service status in audit DB, finds the card generation failed silently. Agent retriggers card generation and responds to the CRM with status update.
+
+Customer Service / Call Center
+
+Example: CRM event: 'Member complaint — no ID card after 30 days' → Enrollment Agent traces: card generation failed at ID Card Service → retriggers → updates CRM: 'Card reissued, arriving in 5 days'
+
+Member issues resolved proactively before they become complaints
+
+
+
+===========================
+
+
+
+Migration-Specific Considerations & Pitfalls
+
+MUST DO
+
+Pre-Migration Baseline Capture
+
+Take a snapshot of legacy source counts (groups, members, plans) BEFORE migration starts. Store in Migration Baseline table. Without this, you can't reconcile.
+
+Migration Event Flag in Metadata
+
+Every migration event must include: is_migration_event=true, migration_batch_id, wave_number, legacy_source_id. This lets the Orchestrator apply migration-specific routing rules.
+
+Separate Migration Reconciliation Dashboard
+
+Don't mix migration tracking with steady-state. Migration Command Center shows wave progress, source-vs-target counts, and exception breakdown separately.
+
+WATCH OUT
+
+Kafka Consumer Lag Under Load
+
+Migration generates 10-100x event volume. If consumers can't keep up, events queue and monitoring goes stale. Solution: auto-scale consumer groups and partition Kafka topics by event_source_type.
+
+Agent Auto-Fix During Migration
+
+Be extra cautious with auto-remediation during migration. A 'fix' that works for steady-state might corrupt migration data. Use recommend-only mode during migration waves.
+
+Cross-Domain Dependency Chain
+
+Migration loads data sequentially (Sales → Enrollment → Billing). If Sales load fails silently, all downstream systems inherit bad data. Orchestrator must enforce stage-gate validation between migration phases.
+==================
+
+
+
+Key Takeaways — Extensible Architecture
+
+01
+
+Event Bus, Not System Tracker
+
+The left side is a unified event bus that accepts events from any source — EBS systems, migration batches, JIRA tickets, SOP compliance, call center CRMs. Same Kafka, same schema, same pipeline.
+
+02
+
+Migration Is Just Another Source
+
+Migration Central plugs into the existing framework as a new event source with migration-specific metadata (batch_id, wave, baseline). Domain agents gain migration fix patterns as additional skills.
+
+03
+
+Agents Are Source-Agnostic
+
+The Orchestrator and domain agents don't care if an event came from EnrollPoint (real-time) or JIRA (webhook) or a migration batch. They care what DOMAIN it belongs to and apply the same intelligence.
+
+04
+
+Add Sources, Not Architecture
+
+When Issue Management or SOPs need to integrate, you add a new Kafka producer + event schema. The Orchestrator's classifier just needs to understand the new event types. Zero changes to agents.
+
+05
+
+Migration Needs Special Care
+
+Pre-migration baselines, migration-specific recon dashboard, consumer auto-scaling for 100x volume, recommend-only mode for agent fixes during migration waves, stage-gate validation between phases.
+
+Bottom line: You're not building an audit tool — you're building an intelligent event-driven platform. Migration, Issue Management, and future sources are just new inputs to the same engine.
+
+
+
+
+
