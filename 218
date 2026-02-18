@@ -1,0 +1,28 @@
+
+Data Flow — What Moves Between Each Layer
+
+Source Systems → Event Bus
+
+event_id, transaction_id (digital fingerprint), event_type, system_source, timestamp, business_keys (group_number, member_id, effective_date), event_status, error_details, source_category
+
+Migration: Migration adds: is_migration_event, migration_batch_id, wave_number, legacy_source_id, expected_vs_actual
+
+Event Bus → Data Layer
+
+Consumer normalizes and persists. Transaction lifecycle stitched via group_number + effective_date + transaction_type. Exception registry captures all failures. Recon engine compares expected vs actual.
+
+Migration: Migration Baseline table stores pre-migration source counts for reconciliation
+
+Data Layer → Orchestrator
+
+Triggers: new exceptions, recon mismatches, SLA breaches, pattern alerts. Passes: full transaction context, related events, historical resolution patterns via RAG.
+
+Orchestrator → Domain Agents
+
+Classified domain, priority level, assembled context (curated — not raw dump), ML confidence score, recommended action path.
+
+Agents → Outputs
+
+Resolution status, actions taken/recommended, updated exception status, patterns learned, JIRA tickets created, alerts sent, dashboard updates.
+
+The digital fingerprint (transaction_id) is the common thread. Without it, you cannot stitch the lifecycle or trace exceptions.
