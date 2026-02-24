@@ -1,0 +1,33 @@
+{
+  // ── 1. IDENTITY (The Digital Fingerprint) ──
+  "digital_fingerprint": "dfp-a1b2c3d4-ef1234567890",
+  "correlation_id": "dfp-a1b2c3d4-ef1234567890",
+  "source_transaction_id": "GEMS-SALE-2026-00451",
+
+  // ── 2. SOURCE (Who Published This) ──
+  "source_system": "GEMS",
+  "source_channel": "KAFKA",
+  "event_timestamp": "2026-02-21T09:14:32Z",
+  "published_at": "2026-02-21T09:14:35Z",
+
+  // ── 3. CLASSIFICATION (What Happened) ──
+  "event_type": "GROUP_SALE",
+  "transaction_type": "ADD",
+  "workflow_step": 3,
+
+  // ── 4. STATUS (The Outcome) ──
+  "event_status": "SUCCESS",
+  "error": null,
+
+  // ── 5. PAYLOAD (Business Context) ──
+  "group_number": "GRP-12345",
+  "member_id": null,
+  "effective_date": "2026-03-01",
+  "member_count": 200,
+  "details": {
+    "plan_type": "PPO"
+  },
+
+  // ── Schema Metadata ──
+  "schema_version": "1.0"
+}
