@@ -1,0 +1,534 @@
+
+How This Fits Your Full Architecture Now
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    FULL REVISED FLOW                                    │
+│                                                                         │
+│  GEMS ──────► Exchange ──► Email Adapter ──────────────────────────┐   │
+│                            (polls mailbox)                          │   │
+│                                                                     │   │
+│  EnrollPoint   Day 1:                                               │   │
+│  (Day 1) ────► Exchange ──► Email Adapter ─────────────────────────►   │
+│                                                                     │   │
+│  EnrollPoint   Day 2:                                               │   │
+│  (Day 2) ────► Splunk Webhook ──► FastAPI ──► Kafka Topic ─────────►   │
+│                                   /ingest/                          │   │
+│                                   enrollpoint                       ▼   │
+│  ORMB ───────► Oracle DB ──► DB Adapter (poll/CDC) ──────────► Kafka   │
+│                                                                 Topic   │
+│  EB Compute ─► DB ──────────► DB Adapter (poll/CDC) ──────────►  │     │
+│                                                                    │    │
+│  EBS Comm ───► DB ──────────► DB Adapter (poll/CDC) ──────────►   │    │
+│                                                                    ▼    │
+│                                                          Normalizer ETL │
+│                                                                    │    │
+│                                                                    ▼    │
+│                                                          Canonical Store│
+└─────────────────────────────────────────────────────────────────────────┘
+
+Where Each Source Writes to Kafka
+┌──────────────────┬──────────────────────────┬────────────────────────┐
+│ Source           │ Who Produces to Kafka    │ Kafka Topic            │
+├──────────────────┼──────────────────────────┼────────────────────────┤
+│ GEMS             │ Email Adapter            │ audit.events.raw       │
+│                  │ (after parsing email)    │                        │
+├──────────────────┼──────────────────────────┼────────────────────────┤
+│ EnrollPoint      │ Day 1: Email Adapter     │ audit.events.raw       │
+│                  │ Day 2: FastAPI receiver  │                        │
+├──────────────────┼──────────────────────────┼────────────────────────┤
+│ ORMB             │ DB Adapter               │ audit.events.raw       │
+│                  │ (after polling/CDC)      │                        │
+├──────────────────┼──────────────────────────┼────────────────────────┤
+│ EB Compute       │ DB Adapter               │ audit.events.raw       │
+│                  │ (after polling/CDC)      │                        │
+├──────────────────┼──────────────────────────┼────────────────────────┤
+│ EBS Comm         │ DB Adapter               │ audit.events.raw       │
+│                  │ (after polling/CDC)      │                        │
+└──────────────────┴──────────────────────────┴────────────────────────┘
+
+All 5 sources → same Kafka topic → one Normalizer ETL consumer
+
+
+Bottom Line — Direct Answer to Your Question
+
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│  Splunk webhook sends to FastAPI                        │
+│  FastAPI then produces to Kafka                         │
+│                                                         │
+│  Splunk cannot natively speak Kafka protocol            │
+│  FastAPI is the HTTP → Kafka bridge                     │
+│  FastAPI is lightweight, your team owns it fully        │
+│  Splunk team just needs a URL + auth token              │
+│                                                         │
+│  Everything — email adapters, DB adapters,              │
+│  AND FastAPI webhook receiver — all produce             │
+│  to the same Kafka topic.                               │
+│                                                         │
+│  Normalizer ETL has ONE place to consume from.         │
+│  Clean. Consistent. Scalable.                           │
+└─────────────────────────────────────────────────────────┘
+
+
+
+
+
+
+┌──────────────────┬──────────────┬─────────────────┬──────────────────┬─────────────────┬──────────┐
+│ Source           │ Current      │ Day 1           │ Day 2            │ Upstream        │ Adapter  │
+│ System           │ Mechanism    │ Approach        │ Approach         │ Team Ask        │ Type     │
+├──────────────────┼──────────────┼─────────────────┼──────────────────┼─────────────────┼──────────┤
+│ GEMS             │ Splunk fires │ Email Adapter   │ Evaluate webhook │ NONE (Day 1)    │ Email    │
+│                  │ email alert  │ reads Exchange  │ migration        │ Optional(Day 2) │ Adapter  │
+│                  │ via Exchange │ mailbox         │ post-proven      │                 │          │
+├──────────────────┼──────────────┼─────────────────┼──────────────────┼─────────────────┼──────────┤
+│ EnrollPoint      │ Splunk fires │ Email Adapter   │ Splunk adds      │ NONE (Day 1)    │ Email    │
+│                  │ email alert  │ reads Exchange  │ webhook action   │ ~1hr config     │ Adapter  │
+│                  │ via Exchange │ mailbox         │ to existing alert│ (Day 2)         │ → Webhook│
+├──────────────────┼──────────────┼─────────────────┼──────────────────┼─────────────────┼──────────┤
+│ ORMB             │ Writes to    │ DB Polling      │ Evaluate CDC     │ Read-only DB    │ DB       │
+│                  │ Oracle DB    │ watermark       │ (LogMiner) if    │ credentials +   │ Adapter  │
+│                  │ tables       │ on status/      │ latency SLA      │ schema docs     │          │
+│                  │              │ exception tables│ demands it       │                 │          │
+├──────────────────┼──────────────┼─────────────────┼──────────────────┼─────────────────┼──────────┤
+│ EB Compute       │ Writes to    │ DB Polling      │ Evaluate CDC     │ Read-only DB    │ DB       │
+│                  │ Oracle/SQL DB│ watermark on    │ or Oracle AQ     │ credentials +   │ Adapter  │
+│                  │ tables       │ job status/     │ if push needed   │ schema docs     │          │
+│                  │              │ exception tables│                  │                 │          │
+├──────────────────┼──────────────┼─────────────────┼──────────────────┼─────────────────┼──────────┤
+│ EBS              │ Writes to    │ DB Polling      │ Evaluate CDC     │ Read-only DB    │ DB       │
+│ Communications   │ Oracle EBS DB│ watermark on    │ or Oracle AQ     │ credentials +   │ Adapter  │
+│                  │ tables       │ comm status/    │ if push needed   │ schema docs +   │          │
+│                  │              │ exception tables│                  │ exception code  │          │
+│                  │              │                 │                  │ mapping table   │          │
+└──────────────────┴──────────────┴─────────────────┴─────────────────┴─────────────────┴──────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                    GUIDING PRINCIPLE                                │
+│                                                                     │
+│  Day 1 = Your team owns the complexity.                            │
+│           Upstream systems change NOTHING.                          │
+│                                                                     │
+│  Day 2 = Selective, additive upstream changes only.                │
+│           Nothing removed. Everything proven first.                 │
+└─────────────────────────────────────────────────────────────────────┘
+
+
+FLOW:
+──────
+Splunk Alert Rule fires
+        │
+        ▼
+Exchange Server receives email
+(gems-alerts@yourorg.com)
+        │
+        ▼
+┌───────────────────────────────┐
+│     GEMS EMAIL ADAPTER        │
+│                               │
+│  Step 1: EWS/Graph API Poll   │
+│  ──────────────────────────   │
+│  Poll mailbox every N mins    │
+│  Auth via service account     │
+│                               │
+│  Step 2: Email Ingestion      │
+│  ──────────────────────────   │
+│  Read unread/new messages     │
+│  Capture MessageID for dedup  │
+│                               │
+│  Step 3: Parse                │
+│  ──────────────────────────   │
+│  Extract from Subject line:   │
+│  → Alert type                 │
+│  → Severity                   │
+│  Extract from Body:           │
+│  → Entity ID                  │
+│  → Exception code             │
+│  → Timestamp                  │
+│                               │
+│  Step 4: Dedup Check          │
+│  ──────────────────────────   │
+│  Hash MessageID               │
+│  Check against processed log  │
+│  Skip if already ingested     │
+│                               │
+│  Step 5: Map to Canonical     │
+│  ──────────────────────────   │
+│  source_system = GEMS         │
+│  event_type = parsed value    │
+│  entity_id = parsed value     │
+│  timestamp = ISO8601          │
+│  exception_code = parsed      │
+│                               │
+│  Step 6: Error Handling       │
+│  ──────────────────────────   │
+│  Parse failure → DLQ          │
+│  Log raw email preserved      │
+└───────────────────────────────┘
+        │
+        ▼
+ETL Normalizer ──► Canonical Store
+
+Day 1 Dependencies:
+
+Exchange service account with READ-ONLY mailbox access
+GEMS alert email format documentation (subject/body structure)
+DLQ target defined
+Upstream Team Ask: Exchange/IT team — service account creation only
+
+SOURCE 2: ENROLLPOINT — Email Adapter (Day 1) → Webhook (Day 2)
+Day 1 Flow (Same as GEMS Email Pattern)
+
+FLOW:
+──────
+Splunk Alert Rule fires
+        │
+        ▼
+Exchange Server receives email
+(enrollpoint-alerts@yourorg.com)
+        │
+        ▼
+┌───────────────────────────────┐
+│  ENROLLPOINT EMAIL ADAPTER    │
+│  (identical pattern to GEMS)  │
+│                               │
+│  Step 1: EWS/Graph API Poll   │
+│  Step 2: Email Ingestion      │
+│  Step 3: Parse subject + body │
+│  Step 4: Dedup via MessageID  │
+│  Step 5: Map to Canonical     │
+│          source = ENROLLPOINT │
+│  Step 6: Error → DLQ          │
+└───────────────────────────────┘
+        │
+        ▼
+ETL Normalizer ──► Canonical Store
+
+
+Day 2 Transition — Adding Webhook (Additive, No Email Removed)
+
+WHAT SPLUNK TEAM ADDS (1 hour effort):
+──────────────────────────────────────
+Existing EnrollPoint Alert in Splunk:
+  Action 1: Send Email ──► Exchange    ← KEEP, do not touch
+  Action 2: POST Webhook ──► FastAPI   ← ADD THIS ONLY
+             endpoint (new)
+
+YOUR TEAM BUILDS (FastAPI Receiver):
+──────────────────────────────────────
+Splunk Webhook POST
+        │
+        ▼
+┌───────────────────────────────┐
+│   FASTAPI INGEST ENDPOINT     │
+│   /ingest/enrollpoint         │
+│                               │
+│  Step 1: Receive POST         │
+│  ──────────────────────────   │
+│  Validate auth token          │
+│  Accept Splunk JSON payload   │
+│                               │
+│  Step 2: Validate Schema      │
+│  ──────────────────────────   │
+│  Confirm required fields      │
+│  Reject malformed → 400       │
+│  Return 200 immediately       │
+│  (async processing after ACK) │
+│                               │
+│  Step 3: Dedup                │
+│  ──────────────────────────   │
+│  Use Splunk alert event_id    │
+│  Check processed event store  │
+│                               │
+│  Step 4: Map to Canonical     │
+│  ──────────────────────────   │
+│  source_system = ENROLLPOINT  │
+│  Pull structured fields       │
+│  directly from JSON           │
+│  No parsing needed            │
+│                               │
+│  Step 5: Forward to Normalizer│
+│  ──────────────────────────   │
+│  Push to internal queue       │
+│  or directly to canonical     │
+└───────────────────────────────┘
+        │
+        ▼
+ETL Normalizer ──► Canonical Store
+
+hy FastAPI for the Webhook Receiver:
+
+Reason	Detail
+Lightweight	Minimal overhead for HTTP ingest endpoint
+Async native	Returns 200 ACK immediately, processes async
+Easy validation	Pydantic models enforce Splunk payload schema
+Fast to build	Your team owns it end-to-end
+No new infrastructure	Runs alongside your normalizer service
+SOURCE 3: ORMB — DB Polling Adapter
+
+
+FLOW:
+──────
+ORMB processes billing/revenue events
+        │
+        ▼
+Writes STATUS and EXCEPTION records
+to Oracle DB tables
+        │
+        ▼
+┌───────────────────────────────┐
+│      ORMB DB ADAPTER          │
+│                               │
+│  Step 1: Connect              │
+│  ──────────────────────────   │
+│  JDBC connection pool         │
+│  Read-only service account    │
+│  to ORMB Oracle schema        │
+│                               │
+│  Step 2: Watermark Poll       │
+│  ──────────────────────────   │
+│  SELECT rows WHERE            │
+│  LAST_UPDATED > checkpoint    │
+│  Run on configured interval   │
+│                               │
+│  Step 3: Extract              │
+│  ──────────────────────────   │
+│  Status table records         │
+│  Exception table records      │
+│  Fetch in micro-batches       │
+│  not row by row               │
+│                               │
+│  Step 4: Schema Map           │
+│  ──────────────────────────   │
+│  ORMB columns → canonical     │
+│  Two sub-mappers:             │
+│  → Status mapper              │
+│  → Exception mapper           │
+│                               │
+│  Step 5: Type Coerce          │
+│  ──────────────────────────   │
+│  Oracle DATE → ISO8601        │
+│  ORMB codes → canonical enums │
+│                               │
+│  Step 6: Checkpoint Write     │
+│  ──────────────────────────   │
+│  Save last processed          │
+│  timestamp/row ID             │
+│  Enables safe restart         │
+│                               │
+│  Step 7: Error Handling       │
+│  ──────────────────────────   │
+│  Failed rows → DLQ            │
+│  Never skip silently          │
+└───────────────────────────────┘
+        │
+        ▼
+ETL Normalizer ──► Canonical Store
+
+
+Day 1 Dependencies:
+
+Read-only JDBC credentials to ORMB Oracle schema
+ORMB status and exception table schema documentation
+Confirmation of LAST_UPDATED or equivalent timestamp column
+Upstream Team Ask: ORMB DBA — read-only service account + schema docs only
+
+SOURCE 4: EB COMPUTE — DB Polling Adapter
+
+FLOW:
+──────
+EB Compute runs billing/compute jobs
+        │
+        ▼
+Writes job STATUS and EXCEPTION
+records to DB tables
+        │
+        ▼
+┌───────────────────────────────┐
+│    EB COMPUTE DB ADAPTER      │
+│                               │
+│  Step 1: Connect              │
+│  ──────────────────────────   │
+│  JDBC connection pool         │
+│  Read-only service account    │
+│                               │
+│  Step 2: Watermark Poll       │
+│  ──────────────────────────   │
+│  SELECT rows WHERE            │
+│  LAST_UPDATED > checkpoint    │
+│                               │
+│  Step 3: Extract              │
+│  ──────────────────────────   │
+│  Compute job status records   │
+│  Compute exception records    │
+│                               │
+│  Step 4: Schema Map           │
+│  ──────────────────────────   │
+│  EB Compute schema → canonical│
+│  Include job_context fields   │
+│  (job_id, batch_id, run_type) │
+│  unique to compute events     │
+│                               │
+│  Step 5: Checkpoint Write     │
+│  Step 6: Error → DLQ          │
+└───────────────────────────────┘
+        │
+        ▼
+ETL Normalizer ──► Canonical Store
+
+
+Key Difference from ORMB: EB Compute events are job-lifecycle events. Canonical schema must include job_context envelope not present in other sources.
+
+Day 1 Dependencies:
+
+Read-only DB credentials to EB Compute schema
+Job status and exception table schema documentation
+
+SOURCE 5: EBS COMMUNICATIONS — DB Polling Adapter
+FLOW:
+──────
+EBS Communications dispatches
+customer communications
+        │
+        ▼
+Writes communication STATUS
+and EXCEPTION records to EBS DB
+        │
+        ▼
+┌───────────────────────────────┐
+│   EBS COMMUNICATIONS          │
+│      DB ADAPTER               │
+│                               │
+│  Step 1: Connect              │
+│  ──────────────────────────   │
+│  JDBC connection to EBS schema│
+│  Read-only service account    │
+│                               │
+│  Step 2: Watermark Poll       │
+│  ──────────────────────────   │
+│  SELECT rows WHERE            │
+│  LAST_UPDATED > checkpoint    │
+│                               │
+│  Step 3: Extract              │
+│  ──────────────────────────   │
+│  Comm dispatch status records │
+│  Comm exception records       │
+│                               │
+│  Step 4: Exception Code Map   │
+│  ──────────────────────────   │
+│  EBS has own exception code   │
+│  taxonomy — translate to      │
+│  canonical exception enum     │
+│  via lookup/translation table │
+│  owned by this adapter        │
+│                               │
+│  Step 5: Schema Map           │
+│  ──────────────────────────   │
+│  EBS Comm schema → canonical  │
+│  Include comm_context fields  │
+│  (comm_type, channel,         │
+│   recipient_ref)              │
+│                               │
+│  Step 6: Checkpoint Write     │
+│  Step 7: Error → DLQ          │
+└───────────────────────────────┘
+        │
+        ▼
+ETL Normalizer ──► Canonical Store
+
+
+
+Key Difference from Others: EBS has its own exception code taxonomy. This adapter owns and maintains the EBS → Canonical exception code translation table. Any new EBS exception codes must be registered here before they flow correctly.
+
+Day 1 Dependencies:
+
+Read-only DB credentials to EBS Communications schema
+EBS exception code mapping documentation
+Comm status and exception table schema docs
+
+Day 1 vs Day 2 — Complete Phasing Summary
+
+┌──────────────────┬────────────────────────────────┬────────────────────────────────┐
+│ Source           │ DAY 1                          │ DAY 2                          │
+├──────────────────┼────────────────────────────────┼────────────────────────────────┤
+│ GEMS             │ Email Adapter                  │ Evaluate Splunk webhook        │
+│                  │ Poll Exchange mailbox           │ migration if email adapter     │
+│                  │ Parse subject + body            │ proves brittle or email        │
+│                  │ Dedup via MessageID             │ format changes frequently      │
+│                  │ No Splunk change                │                                │
+├──────────────────┼────────────────────────────────┼────────────────────────────────┤
+│ EnrollPoint      │ Email Adapter                  │ Splunk adds webhook action     │
+│                  │ Poll Exchange mailbox           │ (additive, email kept)         │
+│                  │ Parse subject + body            │ FastAPI endpoint receives      │
+│                  │ Dedup via MessageID             │ structured Splunk JSON         │
+│                  │ No Splunk change                │ Email adapter retired          │
+│                  │                                 │ as primary, kept as fallback   │
+├──────────────────┼────────────────────────────────┼────────────────────────────────┤
+│ ORMB             │ DB Polling Adapter              │ Evaluate Oracle CDC            │
+│                  │ Watermark on LAST_UPDATED       │ (LogMiner) if latency SLA      │
+│                  │ Read-only JDBC                  │ requires near-real-time        │
+│                  │ Status + Exception sub-mappers  │ Polling stays as fallback      │
+├──────────────────┼────────────────────────────────┼────────────────────────────────┤
+│ EB Compute       │ DB Polling Adapter              │ Evaluate Oracle AQ or CDC      │
+│                  │ Watermark on LAST_UPDATED       │ if job event latency matters   │
+│                  │ Read-only JDBC                  │ Job context enrichment         │
+│                  │ Job context fields included     │ layer can be added             │
+├──────────────────┼────────────────────────────────┼────────────────────────────────┤
+│ EBS Comm         │ DB Polling Adapter              │ Evaluate Oracle AQ or CDC      │
+│                  │ Watermark on LAST_UPDATED       │ EBS exception code taxonomy    │
+│                  │ Read-only JDBC                  │ versioning formalized          │
+│                  │ Exception code translation table│ Cross-source correlation       │
+│                  │ owned by adapter                │ with GEMS comm events          │
+└──────────────────┴────────────────────────────────┴────────────────────────────────┘
+
+
+The Core Question: Where Does the Webhook Land?
+Splunk Webhook POST ──► WHERE? ──► Kafka ──► Normalizer ETL
+
+You have two valid patterns. Let me lay both out cleanly.
+
+Option A — Splunk → FastAPI → Kafka → Normalizer (Recommended)
+┌─────────────────────────────────────────────────────────────────────┐
+│                                                                     │
+│  Splunk ──► POST /ingest/enrollpoint ──► FastAPI ──► Kafka Topic   │
+│              (webhook fires)              (receiver)    │            │
+│                                                         │            │
+│                                                         ▼            │
+│                                               Normalizer ETL         │
+│                                               (consumes topic)       │
+│                                                         │            │
+│                                                         ▼            │
+│                                               Canonical Store        │
+└─────────────────────────────────────────────────────────────────────┘
+
+Why FastAPI sits in front of Kafka
+┌─────────────────────────────────────────────────────────┐
+│  Splunk does NOT speak Kafka natively                   │
+│                                                         │
+│  Splunk webhook = simple HTTP POST                      │
+│  Kafka = binary protocol, needs producer client        │
+│                                                         │
+│  FastAPI bridges the two:                              │
+│  HTTP world ──► FastAPI ──► Kafka world                │
+└─────────────────────────────────────────────────────────┘
+
+FastAPI responsibilities in this path:
+
+Step	What FastAPI Does
+Receive	Accept HTTP POST from Splunk
+Authenticate	Validate API token/secret
+Acknowledge	Return HTTP 200 immediately to Splunk
+Validate	Check payload has required fields
+Produce	Write validated event to Kafka topic
+Error	Malformed payload → reject 400, log it
+Why return 200 immediately (before Kafka write):
+
+Splunk has a short webhook timeout window.
+If your processing is slow, Splunk marks it failed
+and may retry — causing duplicates.
+
+Pattern:
+1. Receive POST
+2. Return 200 ACK  ← do this FAST
+3. Then write to Kafka async
+
