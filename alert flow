@@ -1,0 +1,281 @@
+Step	System	Sub-System / Component	Transaction Level	Trigger / Input	Processing Type	What Happens	Key Tracking Field	Output / Next Step	Notes
+1	GEMS	Group Transaction Source	Group	Group change or sales transaction	Source	Initiates group-level transactions that may or may not impact membership	Group identifiers	Sends transaction into EnrollPoint	GEMS works at group level
+2	GEMS	Transaction Classification	Group	Transaction type from GEMS	Source classification	Transaction may be membership-impacting or non-membership-impacting	Transaction type	Enters EnrollPoint for further processing	About 80 transaction types total
+3	EnrollPoint	Intake from GEMS	Group	GEMS transaction received	Processing entry	EnrollPoint receives GEMS transaction and determines path	Group key / event context	Routed to systematic or manual path	This is where the real split happens
+4	EnrollPoint	GEMS Systematic Path	Group to Member	Membership-impacting transaction with defined processing	Systematic	EnrollPoint auto-processes member updates	Event ID / group linkage	Downstream publish	Member count known
+5	EnrollPoint	GEMS Manual Path	Group to Member	Membership-impacting transaction requiring business action	Manual	Business updates members over time, often across days or weeks	CP status / audit fields	Downstream status updated later	Member count not known upfront
+6	EnrollPoint	CP Status Engine	Group / Member	Manual or systematic progress	Status management	Tracks Active, Completed, or Failure	CP status	Updates event tracking	E-walk closure alone does not mean completion
+7	UI	User Interface	Contract / Member	User submits enrollment change	Source	UI sends enrollment activity into EnrollPoint submission flow	Natural member keys	Submission Service	UI is sequential in behavior
+8	EnrollPoint	Submission Service for UI	Contract / Member	UI submission	Processing entry	Receives UI transaction and creates processing record	Submission record / natural keys	Membership processing	UI and AE both feed here
+9	AE	Hive Table / AE Feed	Contract / Member	File lands in AE table	Source	AE identifies changed contracts or members only	HCCID / member identifiers	Submission Service	Full file received but only changed records processed
+10	AE	Changed Record Selection	Contract / Member	AE table scan	Source pre-processing	AE selects only changed records from incoming file	HCCID / SSN / name	Sends to EnrollPoint submission flow	AE never works at group level
+11	EnrollPoint	Submission Service for AE	Contract / Member	AE sends changed records	Processing entry	Receives AE transaction into EnrollPoint	Natural keys today	Membership processing	Current gap is missing UUID
+12	EnrollPoint	AE/UI Membership Processing	Contract / Member	Records from UI or AE	Processing	Processes member-level enrollment updates	Member keys / submission entry	Membership tables	AE can be parallel, UI more sequential
+13	EnrollPoint	Membership Tables	Group / Contract / Member	Processed records	Data persistence	Stores processed membership information	Member / group reference	Event tracking table	Used for reconciliation lookup
+14	EnrollPoint	Event Tracking Table	Group / Member	Processed status update	Tracking	Stores and updates latest event status	Event ID / status	Adapter / downstream visibility	Status is updated, not duplicated
+15	EnrollPoint	Correlation Layer	Group / Contract / Member	Processing events from GEMS, UI, AE	Tracking	Links activity through IDs and keys	Event ID / UUID / natural keys	Downstream correlation	AE needs UUID added
+16	EnrollPoint	Common Sequencer / Event ID	Group / Member	Event created for downstream	Tracking	Generates or stores common event ID used for downstream tracking	Event ID	ORMB / EB Compute	Critical correlation point
+17	EnrollPoint	Downstream Publish	Group / Member	Processing complete or status update	Publish	Sends event/status to downstream systems	Event ID	ORMB / EB Compute	Kafka useful for high-level publish only
+18	ORMB	ORMB Consumption	Group / Member	Event received from EnrollPoint	Downstream	ORMB consumes event and processes it	Event ID	Status / processing outcome	Event ID is main correlation key
+19	EB Compute	EB Compute Consumption	Group / Member	Event or file received from EnrollPoint	Downstream	EB Compute processes downstream enrollment/billing related data	Event ID if available	Status / processing outcome	Needs confirmation on event ID storage
+20	EnrollPoint / Audit Layer	Reconciliation	Group / Division / Member	Compare source and downstream states	Audit	Reconciles end-to-end flow across systems	Event ID / control totals / status	Dashboard / audit results	Phase 1 is table-based pull approach
+21	EnrollPoint / Audit Layer	Control Totals	Group / Division / Member	Transaction enters EnrollPoint	Audit	Tracks expected counts for reconciliation	Group count / division count / member count	Completeness validation	Works best for systematic transactions
+22	EnrollPoint / Audit Layer	Dashboard / Reporting	Group / Member	Event status and reconciliation results	Audit / Reporting	Shows pending, completed, failure, and stuck flows	Event ID / CP status	Business and operational visibility	Manual flows need status-based visibility
+Simpler system hierarchy table
+
+If you want a more executive Excel sheet, use this version too:
+
+System	Role	Level	Input	Output	Key Tracking	Important Note
+GEMS	Source system	Group	Group transaction	Sends to EnrollPoint	Group identifiers	Can lead to systematic or manual path
+UI	Source system	Contract / Member	User action	Sends to EnrollPoint	Natural keys	Sequential processing
+AE	Source system	Contract / Member	Hive table changed records	Sends to EnrollPoint	Natural keys today, UUID needed	No group-level processing
+EnrollPoint	Core processing hub	Group / Contract / Member	GEMS, UI, AE	Downstream events and status	Event ID, CP status, UUID	Central system in the flow
+ORMB	Downstream system	Group / Member	Event from EnrollPoint	Consumption status	Event ID	Main downstream tracking consumer
+EB Compute	Downstream system	Group / Member	Event or file from EnrollPoint	Processing status	Event ID if available	Correlation needs validation
+Audit Layer	Reconciliation and visibility	Group / Division / Member	Tables and statuses	Dashboard / audit results	Event ID, control totals, CP status	Used for end-to-end tracking
+Best Excel tabs to create
+
+I would suggest 3 tabs:
+
+Tab 1: System Flow
+
+Use the big detailed matrix.
+
+Tab 2: Transaction Logic
+Source	Transaction Type	Path in EnrollPoint	Member Count Known	Tracking Method	Notes
+GEMS	Systematic	Systematic	Yes	Event ID + control totals	Auto processed
+GEMS	Manual	Manual	No	CP status + audit fields	Business updates over time
+UI	User-driven	Standard processing	Usually record level	Submission entry + event tracking	Sequential
+AE	Changed-record file	Standard processing	Record level	Needs UUID + submission trace	Parallel possible
+Tab 3: Gaps and Fixes
+Area	Current Gap	Proposed Fix	Owner
+AE	No UUID correlation	Add UUID to AE to submission service flow	Hari
+Manual GEMS	Unknown member count	Use CP status and audit-driven tracking	Team
+Downstream	Limited closure visibility	Add API callback in phase 2	Team
+EB Compute	Event ID storage unclear	Validate storage and usage	Team
+
+
+
+
+
+============================
+
+
+
+Yes — you’re right. The **center of the flow is EnrollPoint**, and **that is where the systematic vs manual split really matters for GEMS**, while **AE and UI both flow into EnrollPoint submission/service processing first**. Your notes clearly say the design is about tracking **AE, GEMS, and UI through enrollment point to ORMB and EB Compute**. They also say AE data is looked up in enrollment point, and GEMS systematic/manual behavior is determined inside the enrollment point processing context. 
+
+Here is the corrected structure for your flowchart.
+
+# Correct hierarchy
+
+## 1. Source systems
+
+* **GEMS**
+* **AE**
+* **UI**
+
+## 2. Central processing hub
+
+* **EnrollPoint**
+
+  * Submission service
+  * Membership processing
+  * Event tracking
+  * CP status handling
+  * Event ID / correlation handling
+
+## 3. Downstream systems
+
+* **ORMB**
+* **EB Compute**
+
+## 4. Audit and reconciliation layer
+
+* Control totals
+* Status tracking
+* Pending / completed / failure visibility
+* Dashboard / reporting
+
+---
+
+# Correct business flow
+
+## A. GEMS path
+
+GEMS starts at the **group level** and sends transactions into **EnrollPoint**. Once inside EnrollPoint, the transaction follows one of two paths:
+
+* **Systematic**
+
+  * EnrollPoint auto-processes member updates
+  * Member count is known
+  * Full thread continuity is possible
+
+* **Manual**
+
+  * Business updates happen over days or weeks
+  * Member count is not known upfront
+  * CP status must be used to track progress
+
+This means **systematic vs manual is not a source-level split outside the system**. It is a **processing path within the EnrollPoint-driven flow for GEMS transactions**. 
+
+## B. AE path
+
+AE data lands in a Hive table, then goes to the submission service and into **EnrollPoint**. AE operates at the **contract/member level**, not group level. The notes also say the tracking approach is to identify changed contracts or members from AE and then look up corresponding records in enrollment point. The main gap is that AE currently lacks a UUID or correlation ID linking the AE call to the submission service entry. 
+
+## C. UI path
+
+UI also flows into **EnrollPoint** and, like AE, works at the **contract/member level**. Your notes say AE and UI are in the same category, except AE may run in parallel while UI is more sequential. 
+
+---
+
+# Best corrected flowchart structure
+
+Use this exact layout:
+
+```text
+GEMS --------------------\
+                           \
+AE -------------------------> EnrollPoint
+                             - Submission Service
+UI -------------------------> - Membership Processing
+                             - Event Tracking Table
+                             - CP Status Engine
+                             - Event ID / Correlation
+                           /
+                          /
+             For GEMS inside EnrollPoint:
+             -> Systematic Path
+             -> Manual Path
+
+EnrollPoint ------------------> ORMB
+EnrollPoint ------------------> EB Compute
+
+ORMB + EB Compute -----------> Reconciliation / Audit Dashboard
+```
+
+---
+
+# Better version with the GEMS branch shown correctly
+
+```text
+1. GEMS
+   -> EnrollPoint
+      -> Decision: Systematic or Manual
+         -> Systematic
+            -> Known member count
+            -> Auto member processing
+            -> Downstream publish
+         -> Manual
+            -> Business updates over time
+            -> CP Status tracking
+            -> Downstream publish based on status
+
+2. AE
+   -> Hive Table
+   -> Submission Service
+   -> EnrollPoint
+      -> Member/contract processing
+      -> UUID needed
+      -> Downstream publish
+
+3. UI
+   -> User action
+   -> Submission Service
+   -> EnrollPoint
+      -> Member/contract processing
+      -> Downstream publish
+
+4. EnrollPoint to downstream
+   -> ORMB
+   -> EB Compute
+
+5. Audit layer
+   -> Event ID tracking
+   -> Control totals
+   -> Active / Completed / Failure
+   -> Reconciliation dashboard
+```
+
+This matches your notes much better because:
+
+* **EnrollPoint is the center**
+* **GEMS enters EnrollPoint first**
+* **Systematic vs Manual happens in that EnrollPoint processing model**
+* **AE and UI are separate inbound paths into EnrollPoint**
+* **ORMB and EB Compute are downstream of EnrollPoint** 
+
+# What to draw visually
+
+Use 4 vertical zones from left to right:
+
+| Zone          | What goes there                        |
+| ------------- | -------------------------------------- |
+| Left          | GEMS, AE, UI                           |
+| Center        | EnrollPoint                            |
+| Inside Center | GEMS branch into Systematic and Manual |
+| Right         | ORMB, EB Compute, Audit Dashboard      |
+
+---
+
+# Recommended final diagram shape
+
+```text
+[ GEMS ] -----------\
+                     \
+[ AE ] --------------> [ ENROLLPOINT ]
+                     /    - Submission Service
+[ UI ] -------------/     - Membership Tables
+                          - Event Tracking
+                          - CP Status
+                          - Event ID / UUID
+
+Inside ENROLLPOINT:
+[ GEMS Transaction Type? ]
+      /            \
+[ Systematic ]   [ Manual ]
+
+Then:
+[ ENROLLPOINT ] --> [ ORMB ]
+[ ENROLLPOINT ] --> [ EB Compute ]
+
+Then:
+[ Reconciliation / Audit Dashboard ]
+```
+
+---
+
+# Important callouts to place on the diagram
+
+Add these small note boxes:
+
+**For AE**
+
+* Missing UUID today
+* Natural key matching only
+* Need correlation ID
+
+**For GEMS systematic**
+
+* Known member count
+* Full continuity possible
+
+**For GEMS manual**
+
+* Unknown member count
+* CP status based tracking
+
+**For EnrollPoint**
+
+* Central event tracking point
+* Common event ID stored in tables
+
+**For downstream**
+
+* ORMB uses event ID for tracking
+* EB Compute also needs correlation visibility
+
+All of those are directly supported by your notes. 
+
+If you want, I’ll turn this into a **clean PowerPoint-style diagram layout with boxes and arrows exactly how to place them**.
+
+
