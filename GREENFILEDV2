@@ -1,0 +1,544 @@
+
+EBS PLATFORM
+READINESS ASSESSMENT
+
+
+Pre-Audit Self-Assessment Framework
+Structured Readiness Evaluation Aligned to Enterprise Audit Standards
+“Can our platform support a new line of business with minimal change?”
+
+Version
+1.0
+Date
+April 2026
+Classification
+Confidential — Internal Use Only
+Owner
+[Platform Lead]
+Audit Cycle
+Pre-External Readiness — Q2 2026
+Framework Ref
+COBIT 2019
+
+
+
+1. Purpose and Scope
+This assessment evaluates the EBS platform’s readiness to onboard new lines of business. It is structured as a pre-audit self-assessment aligned to enterprise governance standards (COBIT 2019) and designed to surface gaps before an external review.
+The assessment evaluates platform capability across six pillars: governance, data, processing, integration, security, and operational observability. Each question targets a specific readiness risk with a defined objective and signal.
+Scope: EBS Enrollment System — React UI, Java Spring Boot backend on OpenShift, Kafka event publishing, integrations with Sales (inbound), Billing (outbound), Communications (outbound), and EB Compute (data payload).
+2. How to Use This Framework
+This is not a survey. Each pillar is a 30–45 minute structured conversation with the 2–3 people who own the answers. One person asks, one answers, one captures.
+Reading the Columns
+Question — What is being asked. Read as written. Use the Objective if clarification is needed.
+Objective — What this question is really determining. Removes interpretation ambiguity. External auditors use this to validate responses address the actual intent.
+Signal — Answer spectrum from healthy (left) to concerning (right). Instant directional read without a scoring rubric.
+Rating — Green (strong) | Yellow (partial) | Red (gap) | N/A (owned elsewhere — note which team).
+Evidence / Artifact Reference — The specific artifact, tool, or process that supports the rating. Confluence page, Jira epic, Git repo, dashboard link, ADR, RBAC policy, runbook. “Fully implemented” without evidence is a claim, not a finding.
+Respondent — Name and role of the person who provided the answer. This establishes accountability and allows the external auditor to follow up if needed.
+Notes / Remediation — For Yellow/Red: what the gap is, planned remediation, target date, and owner. For N/A: which team owns this area and their audit reference if available.
+3. Executive Summary
+To evaluate whether the EBS platform can support a new line of business, we assess six capabilities:
+#
+Pillar
+Qty
+Core Question
+COBIT Ref
+0
+Onboarding Governance
+3
+Do we have a front door?
+EDM01, APO01
+1
+Data Model
+3
+Can our data represent it?
+APO03, DSS06
+2
+Processing & Workflow
+4
+Can our engine run it?
+BAI03, BAI07
+3
+Integration & Downstream
+3
+Can systems consume it?
+BAI03, DSS01
+4
+Security & Compliance
+4
+Does this change what we protect?
+APO13, DSS05
+5
+Monitoring, Alerts & Recon
+8
+Can we track and prove it?
+DSS01, DSS02, DSS06
+
+Total: 25 questions. Completable in 3–4 focused sessions.
+Scoring
+Rating
+Criteria
+Implication
+Green
+All questions Green or N/A
+Platform ready. No remediation required.
+Yellow
+One or more Yellow, none Red
+Partially ready. Gaps known with remediation plans, owners, and dates.
+Red
+One or more Red
+Not ready. Material risk. Remediation required before onboarding.
+
+Output: One-page scorecard — six pillars with color ratings, top three risks, top three strengths, and a readiness recommendation (Ready / Conditionally Ready / Not Ready).
+
+4. Pillar 0 — Onboarding Governance
+“Do we even have a front door for new business?”
+Before assessing platform capability, this pillar confirms whether a governed process exists for new LOB intake. Without governance, capability assessments are ad hoc and non-repeatable.
+#
+Question
+Objective
+Signal
+Rating
+Evidence / Artifact Reference
+Respondent
+Notes / Remediation
+0.1
+Is there a defined intake process for evaluating a new LOB against the platform?
+Confirm a repeatable, documented process exists for new LOB onboarding requests — not ad hoc conversations that vary by who you ask.
+Repeatable process vs. ad hoc
+
+
+
+
+
+
+
+
+0.2
+Are there go/no-go criteria for when the platform can absorb a new LOB vs. when custom build is needed?
+Validate that explicit criteria exist to determine platform fit — preventing misaligned business from being forced into the platform.
+Defined criteria vs. gut feel
+
+
+
+
+
+
+
+
+0.3
+Is there a single owner accountable for platform readiness decisions?
+Confirm a named individual or role owns the readiness decision with clear escalation path and accountability.
+Named owner vs. shared ambiguity
+
+
+
+
+
+
+
+
+
+Finding threshold: If there is no front door, every onboarding is a fire drill. This is a governance finding that affects every subsequent pillar.
+
+5. Pillar 1 — Data Model
+“Can our data model represent this new business without surgery?”
+The data model is the foundation. If the hierarchy and canonical definitions cannot accommodate the new LOB, no amount of application-layer flexibility compensates.
+#
+Question
+Objective
+Signal
+Rating
+Evidence / Artifact Reference
+Respondent
+Notes / Remediation
+1.1
+Can the current group / division / member hierarchy support this LOB?
+Determine whether foundational data structures can represent the new business without schema redesign. If the hierarchy breaks, everything above it breaks.
+Schema reuse vs. redesign
+
+
+
+
+
+
+
+
+1.2
+Can onboarding be config-driven (new LOB without code changes)?
+Evaluate whether new business activates through configuration (reference data, flags, rules) rather than code deployments — the key indicator of platform scalability.
+Config-driven vs. code change
+
+
+
+
+
+
+
+
+1.3
+Is there a documented data dictionary or canonical model a new LOB team can reference independently?
+Confirm a new team can understand the data model without relying on verbal knowledge transfer from existing members.
+Self-service vs. tribal knowledge
+
+
+
+
+
+
+
+
+
+Finding threshold: If a new team cannot understand the data model without calling three people, the platform is not self-service ready.
+
+6. Pillar 2 — Processing & Workflow
+“Can our engine run this new business or does it need a new engine?”
+Processing readiness determines whether onboarding is a configuration exercise (weeks) or a development project (months). The distinction between reuse and rebuild drives timeline and cost.
+#
+Question
+Objective
+Signal
+Rating
+Evidence / Artifact Reference
+Respondent
+Notes / Remediation
+2.1
+Does this LOB follow existing transaction types (add / change / term / renew)?
+Determine whether the new business fits the existing processing taxonomy so workflow orchestration can be reused.
+Reuse vs. redesign
+
+
+
+
+
+
+
+
+2.2
+Will processing be systematic or manual heavy?
+Assess operational sustainability. Manual-heavy processing introduces human error and limits throughput — it does not scale with additional LOBs.
+Automated vs. manual risk
+
+
+
+
+
+
+
+
+2.3
+Do current services support this logic or do we need new ones?
+Evaluate service layer reuse. Parameter-level changes = fast onboarding. New service design and build = project-level effort and risk.
+Tweaks vs. rebuild
+
+
+
+
+
+
+
+
+2.4
+Can new workflow variations be tested in isolation without impacting existing LOBs?
+Confirm the platform supports isolated testing of new business logic without creating production risk for existing lines of business.
+Isolated vs. shared risk
+
+
+
+
+
+
+
+
+
+Finding threshold: If we cannot test a new LOB without holding our breath about existing ones, that is an architecture-level finding.
+
+7. Pillar 3 — Integration & Downstream
+“Can the systems around us consume what we produce for this new business?”
+Platform readiness is meaningless if downstream consumers break. Integration stability is the highest-risk area during onboarding because it crosses team and system boundaries.
+#
+Question
+Objective
+Signal
+Rating
+Evidence / Artifact Reference
+Respondent
+Notes / Remediation
+3.1
+Can downstream systems consume the existing event format for this LOB?
+Determine whether current event/message structures work for the new business or whether downstream systems need contract changes.
+Mapping tweaks vs. redesign
+
+
+
+
+
+
+
+
+3.2
+Are new event types or statuses needed?
+Assess whether the new LOB introduces lifecycle states or event categories not supported today, requiring schema evolution and consumer updates.
+Evolution vs. breaking change
+
+
+
+
+
+
+
+
+3.3
+Is there a versioning strategy for event schemas so new LOB changes don’t break existing consumers?
+Confirm event schema changes can be introduced backward-compatibly. Without this, onboarding a new LOB risks breaking production consumers.
+Backward compatible vs. breaking
+
+
+
+
+
+
+
+
+
+Finding threshold: We do not just ship events — we ship contracts. If the contract breaks, everything downstream breaks.
+
+8. Pillar 4 — Security & Compliance
+“Does this new business change what we need to protect or how we protect it?”
+Security readiness is about whether current controls are sufficient for new business and whether assessment happens proactively during intake or reactively after build.
+#
+Question
+Objective
+Signal
+Rating
+Evidence / Artifact Reference
+Respondent
+Notes / Remediation
+4.1
+Does this LOB introduce new sensitive data types (PHI, PII variations)?
+Identify whether the new business brings data classifications requiring additional encryption, masking, retention, or consent controls.
+Existing controls vs. new controls
+
+
+
+
+
+
+
+
+4.2
+Are current role-based access controls sufficient for this LOB?
+Determine whether existing RBAC roles and permission scopes cover the new business or whether new roles or data partitioning are required.
+Current roles vs. new scopes
+
+
+
+
+
+
+
+
+4.3
+Do audit logs capture who changed what and when for this flow?
+Confirm audit logging covers the new LOB’s data and transactions with granularity required for regulatory compliance and forensic evidence.
+Covered vs. logging gaps
+
+
+
+
+
+
+
+
+4.4
+Is there a process to evaluate security and compliance impact before a new LOB is onboarded?
+Confirm security assessment is built into the intake process proactively, not discovered after build when it becomes a blocker and rework trigger.
+Proactive vs. reactive
+
+
+
+
+
+
+
+
+
+Finding threshold: If data sensitivity or access patterns change, security must evolve — before build, not after. Reactive security is a delivery and compliance risk.
+
+9. Pillar 5 — Monitoring, Alerts & Reconciliation
+“If something goes wrong at 2 AM, will we know — and can we prove it is right?”
+This is where most platforms fail and where external auditors spend the most time. This pillar carries the most questions because it spans three independently auditable capabilities.
+A. Monitoring — Can we see it?
+#
+Question
+Objective
+Signal
+Rating
+Evidence / Artifact Reference
+Respondent
+Notes / Remediation
+5A.1
+Can we track transaction progress end-to-end for this LOB?
+Confirm every transaction can be traced from source intake through processing to downstream delivery with visibility into each stage.
+Complete tracking vs. blind spots
+
+
+
+
+
+
+
+
+5A.2
+Do we know where a transaction is stuck and why?
+Validate the platform can identify stalled transactions and surface root cause without manual database queries or log parsing.
+Automated detection vs. manual triage
+
+
+
+
+
+
+
+
+
+B. Alerts — Will we know when it breaks?
+#
+Question
+Objective
+Signal
+Rating
+Evidence / Artifact Reference
+Respondent
+Notes / Remediation
+5B.1
+Do we have alerts for failures, delays, or missing steps?
+Confirm business-level alerts exist for critical failure modes — not just infrastructure alerts. A healthy CPU with silently failing enrollments is not healthy.
+Alert rules vs. silent failures
+
+
+
+
+
+
+
+
+5B.2
+Can we differentiate pending vs. failed vs. stuck?
+Validate the status model distinguishes transactions legitimately in progress from those that errored and those silently stuck without progressing.
+Clear status model vs. ambiguity
+
+
+
+
+
+
+
+
+
+C. Reconciliation — Can we prove it is right?
+#
+Question
+Objective
+Signal
+Rating
+Evidence / Artifact Reference
+Respondent
+Notes / Remediation
+5C.1
+Do we have control totals (group, division, member)?
+Confirm completeness checks exist at each hierarchy level so discrepancies are detected automatically, not during month-end close or audit.
+Automated checks vs. manual counts
+
+
+
+
+
+
+
+
+5C.2
+Can we match source → EnrollPoint → downstream using Event ID?
+Validate the core audit capability: can a transaction be traced across all system boundaries using a consistent correlation identifier?
+Strong correlation vs. broken chain
+
+
+
+
+
+
+
+
+5C.3
+Is reconciliation automated or manual/spreadsheet-based?
+Assess scalability of reconciliation. Manual spreadsheet-based reconciliation works for one LOB; it breaks at multiple LOBs or high volume.
+Automated vs. Excel at month-end
+
+
+
+
+
+
+
+
+
+Finding threshold: If we cannot track it, alert on it, and reconcile it — we do not truly support the business. We just hope.
+
+10. Relationship to Detailed Audit Workbook
+This readiness framework is the strategic layer — 25 questions for leadership. The detailed audit workbook (120+ questions across 9 disciplines) is the evidence layer that provides granular backing.
+Readiness Pillar
+Detailed Workbook Tabs
+Pillar 0: Onboarding Governance
+Governance & Process
+Pillar 1: Data Model
+Data & Domain Model
+Pillar 2: Processing & Workflow
+Architecture & Design, Development
+Pillar 3: Integration & Downstream
+Architecture & Design, DevOps & Ops
+Pillar 4: Security & Compliance
+Security & Compliance
+Pillar 5: Monitoring, Alerts & Recon
+DevOps & Operations, Testing & QA
+
+Appendix A — COBIT 2019 Alignment
+Reference these process domains when communicating with external auditors to establish framework alignment.
+COBIT ID
+Process Description
+Mapped Pillar
+EDM01
+Ensure Governance Framework
+Pillar 0
+APO01
+Manage IT Management Framework
+Pillar 0
+APO03
+Manage Enterprise Architecture
+Pillar 1
+APO13
+Manage Security
+Pillar 4
+BAI02
+Manage Requirements Definition
+Detailed Workbook
+BAI03
+Manage Solutions Build
+Pillars 2, 3
+BAI07
+Manage Change Transitioning
+Pillar 2
+DSS01
+Manage Operations
+Pillars 3, 5
+DSS02
+Manage Incidents
+Pillar 5
+DSS05
+Manage Security Services
+Pillar 4
+DSS06
+Manage Business Process Controls
+Pillars 1, 5
+
+
+— End of Document —
