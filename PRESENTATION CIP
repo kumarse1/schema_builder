@@ -1,0 +1,105 @@
+Target state Architecture:
+===================
+In this slide, we will focus on the key features of the target state, which  are centered around  around 3 fundamental elements  of scalability, performance and speed to market
+
+
+Flexible and configurable framework:
+==============================
+
+mainframe applications had limited flexibility, making it challenging to adapt or customize their behavior to changing requirements. If modifications were needed, they typically required extensive coding changes / Testing and Deploying
+
+
+The framework is designed with configurable parameters, settings, or options that influence its behavior, eliminating the need for extensive code changes,
+
+This means onboarding new enrollment sources becomes rapid and much easier, propelling us into a higher efficiency.
+
+Reusability: Components within the framework minimizes the effort required for development, maintenance,
+
+Say the data connector that is responsible for connection to the source to fetch data or the adapter that helps with parsing the data is all configurable.
+
+Adoption of  microservices architecture that breaks down enrollment processes  into smaller, independent services. Each service can be deployed and scaled independently, 
+
+Overall, the comparison illustrates the transition from the rigid and monolithic nature of mainframe systems to the more adaptable and customizable nature of modern frameworks, where changes can be efficiently implemented without requiring extensive coding efforts.
+
+==============================================================
+Enrollment Processing Tracker: basically tracks the entire process end to end
+=============================================================
+
+Today's enrollment processing that uses mainframe technology is outdated and lacks a tracking mechanism to provide transparent insights into data processing at every stage.
+
+ This absence of visibility makes it challenging for businesses to understand the underlying processes.
+
+One of our key goals is to introduce a tracking system that monitors and records data onboarding, ingestion, processing, and the outcomes of these steps. 
+
+This comprehensive visibility will empower businesses to gain a deeper understanding of the entire process, enabling them to make informed decisions.
+
+
+ 
+
+Furthermore, this system will possess the ability to reprocess or replay from the point of failure, eliminating the need to start from the beginning. This feature is particularly valuable for auditing and corrective actions.
+
+Implementation of Digital fingerprint at file level/ Record level and key attribute level is carried throughout the process, which helps with upholding data integrity, and effectively prevents any duplicate processing.
+
+
+===========================
+
+Event store
+============================
+Our aim is to harness the existing Event store capability within the enterprise. 
+
+This specific capability is designed to store each enrollment action comprehensively. It not only promptly disseminates events as they occur but also has the  functionality to generate snapshots.
+
+Imagine scenarios where the business seeks immediate insight into events like new members or new-born enrollments, or even terminations. 
+
+Moreover, business requirements for a time-travel snapshot of a member's journey for analysis or compliance reasons. 
+
+This Event store stands as the solution to fulfill these objectives seamlessly. For understanding any past actions and analyzing historical data
+
+
+==================
+Scalable framework- once built for one enrollment source our objective here is reuse the components/configurable to meet specific business needs 
+
+We are going to use the technologies that has been already used and proved in FLb ecosystem, we take the best in class architectural patterns to represent the needs of the business
+
+The architecture that we are laying out is a combination of architectural patterns that encapsulates Kappa architecture/ Microservices / PUB-sub / CQRS/ Event store/ Materializer , we will touch upon those as we dive deeper into technical slides.
+
+
+
+
+Framework where components can mix and match to meet the business needs instead of rigid and hard coded processes.  The components are scalable, we are using best in class technology, to ensure system can scale horizontally as we add more services as  workload increases its going to scaleup with workload
+
+Our architectural vision entails horizontal scalability, accommodating diverse use cases / scenarios- whether it be batch/ near real time processing, processing group members or individual members which will be streamlined through a unified process that seamlessly integrates both realtime and batch operations. 
+
+The design enables components to be smoothly transitioned from on-premises to the cloud, all while ensuring horizontal scalability
+
+
+
+====================
+Consumer repository:
+===================
+verison of truth after all transformations and enrichments.
+
+Consumer repository provides continuity for existing system and process that are more Rdbms based.provide efficient access for downstream system in a structured approach.
+
+ Consumer repository , that has new concepts for digital member experience and strategies, , this will carry entities that are from the current state and extends entities and attributes necessary for  digital experience
+
+
+Data Governance
+
+====================================
+enterprise are Data governance, data quality, certification process and lineage.
+
+Because every file has a digital fingerprint, raw zone we check, quality measure , deduplicaion certification. Lineage we look at today at file level , we have a strong lineage is like the ledger system.
+=======================================================
+
+Individuation- our goal as part of CIP retirement is to carry one id for the Consumer which is going to be Party- id.
+
+Keeping importance in mind and the vital role that Party-id is going to play,  we will have  a detailed architecture that will be reviewed by the individuation team , that will be scheduled separately. 
+
+===================================================================
+
+We carefully drafted the design ensuring we are mapping to existing tools that are currently used in the flb footprint and building the layers and not standing up any new technologies.
+
+
+The architecture that we are laying out is a combination of architectural patterns that encapsulates Kappa architecture/ Microservices / PUB-sub / CQRS/ Event store/ Materializer , we will touch upon those as we dive deeper into technical slides.
+
